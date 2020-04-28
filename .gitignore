@@ -10,15 +10,5 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 token.dat
-
 *.a
 
-lib/discordpp/
-
-lib/plugin-overload/
-
-lib/plugin-responder/
-
-lib/rest-beast/
-
-lib/websocket-beast/
