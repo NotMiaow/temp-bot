@@ -21,7 +21,7 @@ enum EErrorType
 static const std::map<std::string, EEventType> optionEventTypes {
 	{ "ErrorEvent", EError },
 	{ "CreateEvent", ECreateEvent },
-	{ "CreateVoiceChannel", ECreateVoiceChannel }
+	{ "create-voice-channel", ECreateVoiceChannel }
 };
 
 #endif

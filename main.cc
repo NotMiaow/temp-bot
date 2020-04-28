@@ -21,9 +21,19 @@ using DppBot = dpp::PluginResponder<dpp::PluginOverload<dpp::WebsocketBeast<dpp:
 std::istream &safeGetline(std::istream &is, std::string &t);
 void filter(std::string &target, const std::string &pattern);
 
+auto aioc = std::make_shared<asio::io_context>();
+
 void Loop(std::shared_ptr<DppBot> bot, SharedQueue<Event*>& eventQueue);
+void Stop();
+void WaitForTerminate();
 SharedQueue<Event*> eventQueue;
 MiaBot* mia = nullptr;
+std::thread miaLoop;
+
+std::atomic<bool> alive;
+std::promise<void> exitSignal;
+std::shared_future<void> futureObj;
+std::thread terminateThread;
 
 int main()
 {
@@ -52,24 +62,37 @@ int main()
 			if(msg["content"].get<std::string>().substr(0,1) == bot->prefix)
 			{
 				std::string content = msg["content"].get<std::string>().substr(1);
-				mia->NewMessage(content, msg["guild_id"].get<std::string>());
+				int pos = content.find(' ');
+				std::string command = content.substr(0,pos++);
+				if(pos < content.length() - 1)
+					content = content.substr(pos);
+				if(command == "shutdown")
+				{
+						Stop();
+						miaLoop.join();
+						delete mia;
+						aioc->stop();
+						terminateThread.join();
+				}
+				else
+				{
+					mia->HandleCommand(command, content, msg["guild_id"].get<std::string>());
+				}
 			}
 		 }});
-
-	auto aioc = std::make_shared<asio::io_context>();
 
 	// Set the bot up
 	bot->initBot(6, token, aioc);
 
+	alive = true;
+	futureObj = exitSignal.get_future();
+	terminateThread = std::thread(&WaitForTerminate);
+
 	mia = new MiaBot(eventQueue);
-	std::thread miaLoop = std::thread(&Loop, bot, std::ref(eventQueue));
+	miaLoop = std::thread(&Loop, bot, std::ref(eventQueue));
 
 	// Run the bot!
 	bot->run();
-
-	miaLoop.join();
-	delete mia;
-
 	return 0;
 }
 
@@ -123,7 +146,7 @@ void filter(std::string &target, const std::string &pattern)
 
 void Loop(std::shared_ptr<DppBot> bot, SharedQueue<Event*>& eventQueue)
 {
-	while(true)
+	while(alive)
 	{
 		mia->Loop();
 		while (eventQueue.size())
@@ -139,4 +162,17 @@ void Loop(std::shared_ptr<DppBot> bot, SharedQueue<Event*>& eventQueue)
 			eventQueue.pop_front();
 		}
 	}
+}
+
+void Stop()
+{
+	if(futureObj.wait_for(std::chrono::milliseconds(1)) == std::future_status::timeout)
+		exitSignal.set_value();
+    alive = false;
+}
+
+void WaitForTerminate()
+{
+    while(alive && futureObj.wait_for(std::chrono::milliseconds(1)) == std::future_status::timeout);
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }

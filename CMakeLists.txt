@@ -18,9 +18,12 @@ INCLUDE_DIRECTORIES(
         ${OPENSSL_INCLUDE_DIR}
         ${PROJECT_SOURCE_DIR}/_lib/basic_lib
         ${PROJECT_SOURCE_DIR}/_lib/queue
-        ${PROJECT_SOURCE_DIR}/_lib/componnent_array
+        ${PROJECT_SOURCE_DIR}/_lib/component_array
         ${PROJECT_SOURCE_DIR}/_headers
         ${PROJECT_SOURCE_DIR}/_headers/events
+        ${PROJECT_SOURCE_DIR}/_headers/ecs
+        ${PROJECT_SOURCE_DIR}/_headers/ecs/components
+        ${PROJECT_SOURCE_DIR}/_headers/ecs/systems
 )
 
 add_subdirectory(lib/discordpp)          # discordpp

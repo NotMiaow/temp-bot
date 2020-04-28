@@ -30,16 +30,15 @@ static Event* CreateCreateChannelEvent(std::string message, std::string guildId)
 	return e;
 }
 
-static Event* CreateEvent(std::string content, std::string guildId)
+static Event* CreateEvent(std::string command, std::string content, std::string guildId)
 {
-	int pos = content.find(' ');
-	auto it = optionEventTypes.find(content.substr(0, pos));
+	auto it = optionEventTypes.find(command);
 	if(it != optionEventTypes.end())
 	{
 		switch (it->second)
 		{
 		case ECreateVoiceChannel:
-			return CreateCreateChannelEvent(content.substr(pos++), guildId);
+			return CreateCreateChannelEvent(content, guildId);
 		default:
 			return CreateErrorEvent(ECreateEvent, EWrongEventType);
 		}
