@@ -17,6 +17,7 @@ struct Event
     std::string method;
     std::string type;
     nlohmann::json content;
+	std::string guildId;
 };
 
 struct ErrorEvent : public Event
@@ -38,6 +39,21 @@ struct ErrorEvent : public Event
 	EErrorType geType;
 };
 
+struct ShutdownEvent : public Event
+{
+	ShutdownEvent(std::string guildId)
+	{
+		this->guildId = guildId;
+	}
+	EEventType GetType() const { return EShutdown; }
+	std::string ToDebuggable() const
+	{
+		std::ostringstream os;
+		os << '{' << EShutdown << ';' << guildId << '}';
+		return os.str();
+	}
+};
+
 struct CreateChannelEvent : public Event
 {
 	CreateChannelEvent(std::string method, std::string type, std::string guildId, nlohmann::json content)
@@ -54,8 +70,6 @@ struct CreateChannelEvent : public Event
 		os << '{' << ECreateVoiceChannel << ';' << guildId << ';' << content["name"].get<std::string>() << '}';
 		return os.str();
 	}
-
-	std::string guildId;
 };
 
 #endif

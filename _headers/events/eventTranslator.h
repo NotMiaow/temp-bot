@@ -17,6 +17,12 @@ static Event* CreateErrorEvent(EEventType aType, EErrorType eType)
 	return e;
 }
 
+static Event* CreateShutdownEvent(std::string guildId)
+{
+	Event* e = new ShutdownEvent(guildId);
+	return e;
+}
+
 static Event* CreateCreateChannelEvent(std::string message, std::string guildId)
 {
     std::string method = "POST";
@@ -37,6 +43,8 @@ static Event* CreateEvent(std::string command, std::string content, std::string 
 	{
 		switch (it->second)
 		{
+		case EShutdown:
+			return CreateShutdownEvent(guildId);
 		case ECreateVoiceChannel:
 			return CreateCreateChannelEvent(content, guildId);
 		default:

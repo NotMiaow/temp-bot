@@ -6,6 +6,7 @@
 enum EEventType
 {
 	EError,
+	EShutdown,
 	ECreateEvent,
 	ECreateVoiceChannel
 };
@@ -21,6 +22,7 @@ enum EErrorType
 static const std::map<std::string, EEventType> optionEventTypes {
 	{ "ErrorEvent", EError },
 	{ "CreateEvent", ECreateEvent },
+	{ "shutdown", EShutdown },
 	{ "create-voice-channel", ECreateVoiceChannel }
 };
 

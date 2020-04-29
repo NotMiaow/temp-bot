@@ -52,7 +52,7 @@ int main()
 	}
 
 	std::shared_ptr<DppBot> bot = std::make_shared<DppBot>();
-	bot->debugUnhandled = false;									// Don't complain about unhandled events
+	bot->debugUnhandled = false;
 
 	json self;
 	bot->prefix = "~";
@@ -64,48 +64,34 @@ int main()
 				std::string content = msg["content"].get<std::string>().substr(1);
 				int pos = content.find(' ');
 				std::string command = content.substr(0,pos++);
-				if(pos < content.length() - 1)
-					content = content.substr(pos);
-				if(command == "shutdown")
-				{
-						Stop();
-						miaLoop.join();
-						delete mia;
-						aioc->stop();
-						terminateThread.join();
-				}
-				else
-				{
-					mia->HandleCommand(command, content, msg["guild_id"].get<std::string>());
-				}
+				mia->HandleCommand(command, pos < content.length() - 1 ? content.substr(pos) : "", msg["guild_id"].get<std::string>());
 			}
 		 }});
 
-	// Set the bot up
 	bot->initBot(6, token, aioc);
 
+	// Allow clean termination
 	alive = true;
 	futureObj = exitSignal.get_future();
 	terminateThread = std::thread(&WaitForTerminate);
 
+	// Launch MiaBot
 	mia = new MiaBot(eventQueue);
 	miaLoop = std::thread(&Loop, bot, std::ref(eventQueue));
 
-	// Run the bot!
 	bot->run();
+
+	// Wait for clean termination
+	miaLoop.join();
+	terminateThread.join();
+	delete mia;
+
 	return 0;
 }
 
 std::istream &safeGetline(std::istream &is, std::string &t)
 {
 	t.clear();
-
-	// The characters in the stream are read one-by-one using a std::streambuf.
-	// That is faster than reading them one-by-one using the std::istream.
-	// Code that uses streambuf this way must be guarded by a sentry object.
-	// The sentry object performs various tasks,
-	// such as thread synchronization and updating the stream state.
-
 	std::istream::sentry se(is, true);
 	std::streambuf *sb = is.rdbuf();
 
@@ -151,14 +137,25 @@ void Loop(std::shared_ptr<DppBot> bot, SharedQueue<Event*>& eventQueue)
 		mia->Loop();
 		while (eventQueue.size())
 		{
-			Event* message = eventQueue.front();
-//			std::cout << message->ToDebuggable() << std::endl;
-			if(message != 0)
+			Event* event = eventQueue.front();
+			std::cout << event->ToDebuggable() << std::endl;
+			if(event != 0)
 			{
-//				std::cout << message->method << message->type << message->content << std::endl;
-				bot->call(message->method, message->type, message->content);
+				switch(event->GetType())
+				{
+					case EShutdown:
+						Stop();
+						break;
+					case EError:
+						std::cout << "wutface" << std::endl;
+//						LogError();
+						break;
+					default :
+						bot->call(event->method, event->type, event->content);
+						break;
+				}
 			}
-			delete message;
+			delete event;
 			eventQueue.pop_front();
 		}
 	}
@@ -169,6 +166,8 @@ void Stop()
 	if(futureObj.wait_for(std::chrono::milliseconds(1)) == std::future_status::timeout)
 		exitSignal.set_value();
     alive = false;
+
+	aioc->stop();
 }
 
 void WaitForTerminate()

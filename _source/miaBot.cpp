@@ -17,7 +17,5 @@ void MiaBot::Loop()
 
 void MiaBot::HandleCommand(std::string command, std::string content, std::string guildId)
 {
-    Event* event = CreateEvent(command, content, guildId);
-    if(event->GetType() != EError)
-        m_eventQueue->push_back(event);
+    m_eventQueue->push_back(CreateEvent(command, content, guildId));
 }
