@@ -3,12 +3,20 @@
 
 #include <map>
 
+enum EOffender
+{
+	ESystem,
+	EUser
+};
+
 enum EEventType
 {
 	EError,
 	EShutdown,
 	ECreateEvent,
-	ECreateVoiceChannel
+	ESetChannelId,
+	ECreateVoiceChannel,
+	EUpdateVoiceChannel
 };
 
 enum EErrorType
@@ -22,6 +30,7 @@ enum EErrorType
 static const std::map<std::string, EEventType> optionEventTypes {
 	{ "ErrorEvent", EError },
 	{ "CreateEvent", ECreateEvent },
+	{ "SetChannelId", ESetChannelId },
 	{ "shutdown", EShutdown },
 	{ "create-voice-channel", ECreateVoiceChannel }
 };

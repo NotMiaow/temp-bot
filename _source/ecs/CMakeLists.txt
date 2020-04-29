@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.16)
-project(td_game_server)
+cmake_minimum_required(VERSION 3.7)
+project(mia_bot)
 
 set(ECS_SOURCE
     ${SYSTEMS_SOURCE}

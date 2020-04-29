@@ -25,4 +25,20 @@ static int RoundToInt(float number)
 	return (number - temp) > 0.5f ? (int)temp + 1 : (int)temp;
 }
 
+static std::vector<std::string> Split(const std::string s, const char& delimiter)
+{
+	std::vector<std::string> strings;
+
+	std::size_t current, previous = 0;
+    current = s.find_first_of(delimiter);
+
+    while (current != std::string::npos) {
+        strings.push_back(s.substr(previous, current - previous));
+        previous = current + 1;
+        current = s.find_first_of(delimiter, previous);
+    }
+    strings.push_back(s.substr(previous, current - previous));
+	return strings;
+}
+
 #endif

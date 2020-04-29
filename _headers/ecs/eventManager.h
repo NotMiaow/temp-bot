@@ -6,18 +6,19 @@
 #include <math.h>
 #include <deque>
 
-//Events
+// Events
 #include "eventLanguage.h"
 #include "event.h"
 #include "shared_queue.h"
+#include "eventTranslator.h"
 
 #include "entityCounter.h"
 #include "componentArray.h"
-//Components
 
-//Networking
+// Components
+#include "userGroupComponent.h"
 
-//Misc
+// Misc
 #include "definitions.h"
 
 class EventManager
@@ -25,13 +26,15 @@ class EventManager
 public:
     EventManager() { }
     ~EventManager();
-    void Init(SharedQueue<Event*>& eventQueue, EntityCounter& entityCounter);
-    void Loop();
+    void Init(SharedQueue<Event*>& eventQueue, EntityCounter& entityCounter, UserGroups& userGroups);
+    bool HandleEvent(Event* event);
+    bool SetChannelId(Event* event);
+    bool CreateVoiceChannel(Event* event);
 private:
-    void SwitchEvent();
-private:
+    // Components
+    UserGroups* m_userGroups;
+
     EntityCounter* m_entityCounter;
-    Event* m_event;
     SharedQueue<Event*>* m_eventQueue;
 };
 

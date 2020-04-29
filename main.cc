@@ -23,17 +23,21 @@ void filter(std::string &target, const std::string &pattern);
 
 auto aioc = std::make_shared<asio::io_context>();
 
+// Mia related
 void Loop(std::shared_ptr<DppBot> bot, SharedQueue<Event*>& eventQueue);
+std::thread miaLoop;
+MiaBot* mia = nullptr;
+SharedQueue<Event*> eventQueue;
+
+// Shutdown related
 void Stop();
 void WaitForTerminate();
-SharedQueue<Event*> eventQueue;
-MiaBot* mia = nullptr;
-std::thread miaLoop;
-
+std::thread terminateThread;
 std::atomic<bool> alive;
 std::promise<void> exitSignal;
 std::shared_future<void> futureObj;
-std::thread terminateThread;
+
+void SendError();
 
 int main()
 {
@@ -64,9 +68,26 @@ int main()
 				std::string content = msg["content"].get<std::string>().substr(1);
 				int pos = content.find(' ');
 				std::string command = content.substr(0,pos++);
-				mia->HandleCommand(command, pos < content.length() - 1 ? content.substr(pos) : "", msg["guild_id"].get<std::string>());
+				mia->HandleCommand(
+					command,
+					pos < content.length() - 1 ? content.substr(pos) : ""
+					, msg["channel_id"],
+					msg["guild_id"]
+				);
 			}
-		 }});
+		 }}
+	);
+	bot->handlers.insert(
+		{"CHANNEL_CREATE",
+			[&bot, &self](json msg) {
+				mia->HandleCommand(
+					"SetChannelId",
+					msg["name"].get<std::string>() + " " + msg["parent_id"].get<std::string>() + " " + msg["id"].get<std::string>(),
+					"",
+					""
+				);
+		}}
+	);
 
 	bot->initBot(6, token, aioc);
 
@@ -79,6 +100,7 @@ int main()
 	mia = new MiaBot(eventQueue);
 	miaLoop = std::thread(&Loop, bot, std::ref(eventQueue));
 
+	// Run bot
 	bot->run();
 
 	// Wait for clean termination
@@ -139,7 +161,7 @@ void Loop(std::shared_ptr<DppBot> bot, SharedQueue<Event*>& eventQueue)
 		{
 			Event* event = eventQueue.front();
 			std::cout << event->ToDebuggable() << std::endl;
-			if(event != 0)
+			if(event != 0 && !event->ReadOnly())
 			{
 				switch(event->GetType())
 				{
@@ -147,8 +169,7 @@ void Loop(std::shared_ptr<DppBot> bot, SharedQueue<Event*>& eventQueue)
 						Stop();
 						break;
 					case EError:
-						std::cout << "wutface" << std::endl;
-//						LogError();
+						bot->call("POST", "/channels/" + event->channelId + "/messages", json({{"content", ((ErrorEvent*)event)->message }}));
 						break;
 					default :
 						bot->call(event->method, event->type, event->content);

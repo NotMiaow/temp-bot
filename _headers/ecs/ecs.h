@@ -22,12 +22,13 @@ class ECS
 public:
 	ECS() {}
 	~ECS();
-	void Init(SharedQueue<Event*>& eventQueue, EntityCounter& entityCounter);
-	bool Loop();
+	void Init(SharedQueue<Event*>& eventQueue, EntityCounter& entityCounter, UserGroups& userGroups);
+	void Loop();
 private:
 	void WaitForTerminate();
 private:
 	//Components
+	UserGroups* m_userGroups;
 	
 	//Shared resources
 	EntityCounter* m_entityCounter;

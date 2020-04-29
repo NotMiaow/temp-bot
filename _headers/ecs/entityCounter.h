@@ -5,9 +5,9 @@ class EntityCounter
 {
 public:
     EntityCounter() { m_entityCounter = 0; }
-    const int GetId() { return m_entityCounter++; }
+    const uint GetId() { return m_entityCounter++; }
 private:
-    int m_entityCounter;
+    uint m_entityCounter;
 };
 
 #endif
