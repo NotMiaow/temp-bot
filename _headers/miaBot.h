@@ -22,13 +22,16 @@
 class MiaBot
 {
 public:
-    MiaBot(SharedQueue<Event*>& eventQueue);
+    MiaBot(SharedQueue<Event*>& eventQueue, SharedQueue<Event*>& robotQueue, SharedQueue<Event*>& humanQueue);
     ~MiaBot();
     void Loop();
-    void HandleCommand(std::string command, std::string content, std::string channelId, std::string guildId);
+    void QueueCommand(bool fromAPI, std::string command, std::string content, std::string channelId, std::string guildId);
+    bool HandleEvent(Event* event);
 private:
     // Shared resources
     SharedQueue<Event*>* m_eventQueue;
+    SharedQueue<Event*>* m_robotQueue;
+    SharedQueue<Event*>* m_humanQueue;
 
     // Components
     UserGroups m_userGroups;

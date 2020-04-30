@@ -18,24 +18,33 @@ static Event* CreateErrorEvent(std::string message, std::string channelId, EOffe
 	return e;
 }
 
+static Event* CreateEmptyEvent()
+{
+	Event* e = new EmptyEvent();
+	return e;
+}
+
 static Event* CreateShutdownEvent()
 {
 	Event* e = new ShutdownEvent();
 	return e;
 }
 
-static Event* CreateSetChannelIdEvent(std::string command, std::vector<std::string> parameters, std::string channelId, std::string guildId)
+static Event* CreateNewChannelEvent(bool fromAPI, std::string command, std::vector<std::string> parameters, std::string channelId, std::string guildId)
 {
 	UserGroupComponent userGroup;
 	userGroup.name = parameters[0];
 	userGroup.parentId = parameters[1];
 	userGroup.id = parameters[2];
 
-	Event* e = new SetChannelIdEvent(userGroup);
+	if(!ToInt(parameters[3], userGroup.position))
+		return CreateErrorEvent("Parameter 4 (channel position) of " + command + " must be a integral number.", channelId, EUser, ENewChannelEvent, EWrongParameterType);
+
+	Event* e = new NewChannelEvent(userGroup);
 	return e;
 }
 
-static Event* CreateCreateChannelEvent(std::string command, std::vector<std::string> parameters, std::string channelId, std::string guildId)
+static Event* CreateCreateChannelEvent(bool fromAPI, std::string command, std::vector<std::string> parameters, std::string channelId, std::string guildId)
 {
     std::string method = "POST";
     std::string type = "/guilds/" + guildId + "/channels";
@@ -48,28 +57,38 @@ static Event* CreateCreateChannelEvent(std::string command, std::vector<std::str
 	if(!ToInt(parameters[3], userGroup.position))
 		return CreateErrorEvent("Parameter 4 (channel position) of " + command + " must be a integral number.", channelId, EUser, ECreateVoiceChannel, EWrongParameterType);
 
-	Event *e = new CreateVoiceChannelEvent(method, type, channelId, guildId, userGroup);
+	Event *e = new CreateVoiceChannelEvent(fromAPI, method, type, channelId, guildId, userGroup);
 	return e;
 }
 
-static Event* CreateUpdateChannelEvent(std::string command, std::vector<std::string> parameters, std::string channelId, std::string guildId)
+static Event* CreateUpdateChannelEvent(bool fromAPI, std::string command, std::vector<std::string> parameters, std::string channelId, std::string guildId)
 {
     std::string method = "PATCH";
     std::string type = "/channels/";
 	UserGroupComponent userGroup;
-	int id;
+	userGroup.id = parameters[0];
+	type += parameters[0];
 
-	if(!ToInt(parameters[0], id))
-		return CreateErrorEvent("Parameter 2 (new channel position) of " + command + " must be a integral number.", channelId, EUser, ECreateVoiceChannel, EWrongParameterType);
 	if(!ToInt(parameters[1], userGroup.position))
 		return CreateErrorEvent("Parameter 2 (new channel position) of " + command + " must be a integral number.", channelId, EUser, ECreateVoiceChannel, EWrongParameterType);
 
-	type += id;
-	Event* e = new UpdateVoiceChannelEvent(method, type, channelId, guildId, userGroup);
+	Event* e = new UpdateVoiceChannelEvent(fromAPI, method, type, channelId, guildId, userGroup);
 	return e;
 }
 
-static Event* CreateEvent(std::string command, std::string content, std::string channelId, std::string guildId)
+static Event* CreateDeleteChannelEvent(bool fromAPI, std::string command, std::vector<std::string> parameters, std::string channelId, std::string guildId)
+{
+    std::string method = "DELETE";
+    std::string type = "/channels/";
+	UserGroupComponent userGroup;
+	userGroup.id = parameters[0];
+	type += parameters[0];
+
+	Event* e = new DeleteChannelEvent(fromAPI, method, type, channelId, guildId, userGroup);
+	return e;
+}
+
+static Event* CreateEvent(bool fromAPI, std::string command, std::string content, std::string channelId, std::string guildId)
 {
 	std::vector<std::string> parameters = Split(content, ' ');
 
@@ -78,14 +97,16 @@ static Event* CreateEvent(std::string command, std::string content, std::string 
 	{
 		switch (it->second)
 		{
+		case EEmpty:
+			return CreateEmptyEvent();
 		case EShutdown:
 			return CreateShutdownEvent();
-		case ESetChannelId:
-			return CreateSetChannelIdEvent(command, parameters, channelId, guildId);
+		case ENewChannelEvent:
+			return CreateNewChannelEvent(fromAPI, command, parameters, channelId, guildId);
 		case ECreateVoiceChannel:
-			return CreateCreateChannelEvent(command, parameters, channelId, guildId);
+			return CreateCreateChannelEvent(fromAPI, command, parameters, channelId, guildId);
 		case EUpdateVoiceChannel:
-			break;
+			return CreateUpdateChannelEvent(fromAPI, command, parameters, channelId, guildId);
 		default:
 			return CreateErrorEvent("This command does not exist.", channelId, EUser, ECreateEvent, EWrongEventType);
 		}

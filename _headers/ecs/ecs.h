@@ -22,7 +22,7 @@ class ECS
 public:
 	ECS() {}
 	~ECS();
-	void Init(SharedQueue<Event*>& eventQueue, EntityCounter& entityCounter, UserGroups& userGroups);
+	void Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, UserGroups& userGroups);
 	void Loop();
 private:
 	void WaitForTerminate();
@@ -32,7 +32,7 @@ private:
 	
 	//Shared resources
 	EntityCounter* m_entityCounter;
-	SharedQueue<Event*>* m_eventQueue;
+	SharedQueue<Event*>* m_robotQueue;
 
 	//Systems
 	TimeSystem m_timeSystem;

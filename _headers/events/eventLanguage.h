@@ -12,11 +12,13 @@ enum EOffender
 enum EEventType
 {
 	EError,
+	EEmpty,
 	EShutdown,
 	ECreateEvent,
-	ESetChannelId,
+	ENewChannelEvent,
 	ECreateVoiceChannel,
-	EUpdateVoiceChannel
+	EUpdateVoiceChannel,
+	EDeleteChannel
 };
 
 enum EErrorType
@@ -29,10 +31,13 @@ enum EErrorType
 
 static const std::map<std::string, EEventType> optionEventTypes {
 	{ "ErrorEvent", EError },
+	{ "EmptyEvent", EEmpty },
 	{ "CreateEvent", ECreateEvent },
-	{ "SetChannelId", ESetChannelId },
+	{ "SetChannelId", ENewChannelEvent },
 	{ "shutdown", EShutdown },
-	{ "create-voice-channel", ECreateVoiceChannel }
+	{ "create-voice-channel", ECreateVoiceChannel },
+	{ "update-voice-channel", EUpdateVoiceChannel },
+	{ "remove-channel", EDeleteChannel }
 };
 
 #endif
