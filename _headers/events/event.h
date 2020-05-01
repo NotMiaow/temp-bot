@@ -14,6 +14,7 @@
 
 struct Event
 {
+	virtual bool ReadOnly() const = 0;
 	virtual bool WaitForResponse() const = 0;
 	virtual EEventType GetType() const = 0;
 	virtual std::string ToDebuggable() const = 0;
@@ -37,6 +38,7 @@ struct ErrorEvent : public Event
 		this->message = message;
 		this->channelId = channelId;
 	}
+	bool ReadOnly() const { return false; }
 	bool WaitForResponse() const { return false; }
 	EEventType GetType() const { return EError; }
 	std::string ToDebuggable() const
@@ -58,6 +60,7 @@ struct EmptyEvent : public Event
 	{
 		fromAPI = true;
 	}
+	bool ReadOnly() const { return true; }
 	bool WaitForResponse() const { return false; }
 	EEventType GetType() const { return EEmpty; }
 	std::string ToDebuggable() const
@@ -74,6 +77,7 @@ struct ShutdownEvent : public Event
 	{
 		fromAPI = false;
 	}
+	bool ReadOnly() const { return false; }
 	bool WaitForResponse() const { return false; }
 	EEventType GetType() const { return EShutdown; }
 	std::string ToDebuggable() const
@@ -92,6 +96,7 @@ struct NewChannelEvent : public Event
 		this->userGroup = userGroup;
 		this->content = { };
 	}
+	bool ReadOnly() const { return true; }
 	bool WaitForResponse() const { return false; }
 	EEventType GetType() const { return ENewChannelEvent; }
 	std::string ToDebuggable() const
@@ -103,9 +108,9 @@ struct NewChannelEvent : public Event
 	UserGroupComponent userGroup;
 };
 
-struct CreateVoiceChannelEvent : public Event
+struct CreateChannelEvent : public Event
 {
-	CreateVoiceChannelEvent(bool fromAPI, std::string method, std::string type, std::string channelId, std::string guildId, UserGroupComponent userGroup)
+	CreateChannelEvent(bool fromAPI, std::string method, std::string type, std::string channelId, std::string guildId, UserGroupComponent userGroup)
 	{
 		this->fromAPI = fromAPI;
 		this->method = method;
@@ -115,19 +120,20 @@ struct CreateVoiceChannelEvent : public Event
 		this->userGroup = userGroup;
 		this->content = {
     	    { "name", userGroup.name },
-    	    { "type", 2 },
-			{ "user_limit",  userGroup.userLimit },
+    	    { "type", userGroup.type },
 			{ "parent_id", userGroup.parentId },
-			{ "position", userGroup.position }
+			{ "position", userGroup.position },
+			{ "user_limit", (userGroup.type == 0 ? 1 : userGroup.userLimit) }
 	    };
 	}
+	bool ReadOnly() const { return false; }
 	bool WaitForResponse() const { return true; }
-	EEventType GetType() const { return ECreateVoiceChannel; }
+	EEventType GetType() const { return ECreateChannel; }
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << ECreateVoiceChannel << ';' << channelId  << ';' << guildId << ';' << userGroup.name <<  ';' << 
-			userGroup.userLimit <<  ';' << userGroup.parentId <<  ';' << userGroup.position << '}';
+		os << '{' << ECreateChannel << ';' << channelId  << ';' << guildId << ';' << userGroup.name << ';' << userGroup.type << ';' << 
+		userGroup.parentId <<  ';' << userGroup.position << std::string(userGroup.type == 0 ? "" : ";" + std::to_string(userGroup.userLimit)) << '}';
 		return os.str();
 	}
 
@@ -148,12 +154,13 @@ struct UpdateVoiceChannelEvent : public Event
 			{ "position", userGroup.position }
 	    };
 	}
+	bool ReadOnly() const { return false; }
 	bool WaitForResponse() const { return true; }
-	EEventType GetType() const { return EUpdateVoiceChannel; }
+	EEventType GetType() const { return EUpdateChannel; }
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << EUpdateVoiceChannel << ';' << channelId  << ';' << guildId << ';' << userGroup.id << ';' << userGroup.position << '}';
+		os << '{' << EUpdateChannel << ';' << channelId  << ';' << guildId << ';' << userGroup.id << ';' << userGroup.position << '}';
 		return os.str();
 	}
 
@@ -172,12 +179,68 @@ struct DeleteChannelEvent : public Event
 		this->userGroup = userGroup;
 		this->content = { };
 	}
+	bool ReadOnly() const { return false; }
 	bool WaitForResponse() const { return true; }
 	EEventType GetType() const { return EDeleteChannel; }
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
 		os << '{' << EDeleteChannel << ';' << userGroup.id << '}';
+		return os.str();
+	}
+
+	UserGroupComponent userGroup;
+};
+
+struct MoveChannelEvent : public Event
+{
+	MoveChannelEvent(bool fromAPI, std::string channelId, std::string guildId, UserGroupComponent userGroup)
+	{
+		this->fromAPI = fromAPI;
+		this->method = method;
+		this->type = type;
+		this->channelId = channelId;
+		this->guildId = guildId;
+		this->userGroup = userGroup;
+		this->content = { };
+	}
+	bool ReadOnly() const { return true; }
+	bool WaitForResponse() const { return true; }
+	EEventType GetType() const { return EMoveChannel; }
+	std::string ToDebuggable() const
+	{
+		std::ostringstream os;
+		os << '{' << EMoveChannel << ';' << channelId  << ';' << guildId << ';' << userGroup.id << ';' << userGroup.position << '}';
+		return os.str();
+	}
+
+	UserGroupComponent userGroup;
+};
+
+struct CreateCategoryEvent : public Event
+{
+	CreateCategoryEvent(bool fromAPI, std::string method, std::string type, std::string channelId, std::string guildId, UserGroupComponent userGroup)
+	{
+		this->fromAPI = fromAPI;
+		this->method = method;
+		this->type = type;
+		this->channelId = channelId;
+		this->guildId = guildId;
+		this->userGroup = userGroup;
+		this->content = {
+    	    { "name", userGroup.name },
+    	    { "type", userGroup.type },
+			{ "position", userGroup.position }
+	    };
+	}
+	bool ReadOnly() const { return false; }
+	bool WaitForResponse() const { return true; }
+	EEventType GetType() const { return ECreateCategory; }
+	std::string ToDebuggable() const
+	{
+		std::ostringstream os;
+		os << '{' << ECreateCategory << ';' << channelId  << ';' << guildId << ';' << userGroup.name << ';' << userGroup.type << ';' << 
+		userGroup.position << '}';
 		return os.str();
 	}
 

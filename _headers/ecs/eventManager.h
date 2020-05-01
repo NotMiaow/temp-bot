@@ -30,9 +30,13 @@ public:
     void Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, UserGroups& userGroups);
     bool HandleEvent(Event* event);
     bool NewChannel(Event* event);
-    bool CreateVoiceChannel(Event* event);
-    bool UpdateVoiceChannel(Event* event);
+    bool CreateChannel(Event* event);
+    bool UpdateChannel(Event* event);
     bool DeleteChannel(Event* event);
+    bool MoveChannel(Event* event);
+    bool CreateCategory(Event* event);
+    void AdjustChannelpositions(std::map<int,int>& userGroupOrder, std::string parentId, std::string channelId, std::string guildId);
+    bool GetChannelById(UserGroups::Entry*& userGroup, std::string id);
 private:
     // Components
     UserGroups* m_userGroups;

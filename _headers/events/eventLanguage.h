@@ -16,9 +16,11 @@ enum EEventType
 	EShutdown,
 	ECreateEvent,
 	ENewChannelEvent,
-	ECreateVoiceChannel,
-	EUpdateVoiceChannel,
-	EDeleteChannel
+	ECreateChannel,
+	EUpdateChannel,
+	EDeleteChannel,
+	EMoveChannel,
+	ECreateCategory
 };
 
 enum EErrorType
@@ -33,11 +35,13 @@ static const std::map<std::string, EEventType> optionEventTypes {
 	{ "ErrorEvent", EError },
 	{ "EmptyEvent", EEmpty },
 	{ "CreateEvent", ECreateEvent },
-	{ "SetChannelId", ENewChannelEvent },
 	{ "shutdown", EShutdown },
-	{ "create-voice-channel", ECreateVoiceChannel },
-	{ "update-voice-channel", EUpdateVoiceChannel },
-	{ "remove-channel", EDeleteChannel }
+	{ "new-channel", ENewChannelEvent },
+	{ "create-channel", ECreateChannel },
+	{ "update-channel", EUpdateChannel },
+	{ "delete-channel", EDeleteChannel },
+	{ "move-channel", EMoveChannel },
+	{ "create-category", ECreateCategory }
 };
 
 #endif

@@ -95,11 +95,12 @@ int main()
 			[&bot, &self](json msg) {
 				mia->QueueCommand(
 					true,
-					"SetChannelId",
+					"new-channel",
 					msg["name"].get<std::string>() + " " +
 					(msg["parent_id"].is_null() ? "" : msg["parent_id"].get<std::string>()) + " " +
 					msg["id"].get<std::string>() + " " +
-					std::to_string(msg["position"].get<int>()),
+					std::to_string(msg["position"].get<int>()) + " " +
+					std::to_string(msg["type"].get<int>()),
 					"",
 					""
 				);
@@ -175,7 +176,7 @@ void SendQueuedRequests(std::shared_ptr<DppBot> bot) {
 		if (eventQueue.size())
 		{
 			Event* event = eventQueue.front();
-			if(event != 0 && mia->HandleEvent(event) && !event->fromAPI)
+			if(event != 0 && mia->HandleEvent(event) && !event->fromAPI && !event->ReadOnly())
 			{
 				std::cout << "send : " << event->ToDebuggable() << std::endl;
 				switch(event->GetType())

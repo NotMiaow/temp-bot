@@ -13,6 +13,7 @@ public:
     }
     ~UserGroupComponent() { }
     std::string id;
+    int type;
     std::string name;
     int userLimit;
     std::string parentId;

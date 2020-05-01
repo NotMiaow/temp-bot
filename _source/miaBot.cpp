@@ -2,7 +2,7 @@
 
 MiaBot::MiaBot(SharedQueue<Event*>& eventQueue, SharedQueue<Event*>& robotQueue, SharedQueue<Event*>& humanQueue)
 {
-    m_userGroups.Initialise({20});
+    m_userGroups.Initialise({20,20});
 
     m_eventQueue = &eventQueue;
     m_robotQueue = &robotQueue;
