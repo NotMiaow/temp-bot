@@ -2,13 +2,13 @@
 
 MiaBot::MiaBot(SharedQueue<Event*>& eventQueue, SharedQueue<Event*>& robotQueue, SharedQueue<Event*>& humanQueue)
 {
-    m_userGroups.Initialise({20,20});
+    m_groups.Initialise({10,20,20});
 
     m_eventQueue = &eventQueue;
     m_robotQueue = &robotQueue;
     m_humanQueue = &humanQueue;
-    m_eventManager.Init(*m_robotQueue, m_entityCounter, m_userGroups);
-    m_ecs.Init(*m_robotQueue, m_entityCounter, m_userGroups);
+    m_eventManager.Init(*m_robotQueue, m_entityCounter, m_groups);
+    m_ecs.Init(*m_robotQueue, m_entityCounter, m_groups);
 }
 
 MiaBot::~MiaBot()

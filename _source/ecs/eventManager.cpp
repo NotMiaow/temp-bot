@@ -5,9 +5,9 @@ EventManager::~EventManager()
 
 }
 
-void EventManager::Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, UserGroups& userGroups)
+void EventManager::Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Groups& userGroups)
 {
-    m_userGroups = &userGroups;
+    m_groups = &userGroups;
 
     m_entityCounter = &entityCounter;
     m_robotQueue = &robotQueue;
@@ -23,30 +23,34 @@ bool EventManager::HandleEvent(Event* event)
         return true;
     case EShutdown:
         return true;
-    case ENewChannelEvent:
-        return NewChannel(event);
+    case ENewGroup:
+        return NewGroup(event);
+    case EUpdateGroup:
+        return UpdateGroup(event);
     case ECreateChannel:
         return CreateChannel(event);
-    case EUpdateChannel:
-        return UpdateChannel(event);
     case EDeleteChannel:
         return DeleteChannel(event);
     case EMoveChannel:
         return MoveChannel(event);
+    case ECreateCategory:
+        return CreateCategory(event);
+    case EMoveCategory:
+        return MoveCategory(event);
     default:
         return false;
     }
 }
 
-bool EventManager::NewChannel(Event* event)
+bool EventManager::NewGroup(Event* event)
 {
-    NewChannelEvent* newChannelEvent = dynamic_cast<NewChannelEvent*>(event);
+    NewGroupEvent* newGroupEvent = dynamic_cast<NewGroupEvent*>(event);
 
-    if(!newChannelEvent->fromAPI)
+    if(!newGroupEvent->fromAPI)
     {
         m_robotQueue->push_back(CreateErrorEvent(
-            "Use of command : \"new-channel\" is forbidden",
-            newChannelEvent->channelId,
+            "Use of command : \"new-group\" is forbidden",
+            newGroupEvent->channelId,
             EUser,
             ECreateChannel,
             EForbidden
@@ -54,54 +58,102 @@ bool EventManager::NewChannel(Event* event)
         return false;
     }
 
-    for(UserGroupsIterator userGroupIt = m_userGroups->GetIterator();
-        !userGroupIt.End(); userGroupIt++)
+    int groupCheckpoint;
+    switch (newGroupEvent->group.type)
     {
-        UserGroups::Entry* channel = userGroupIt.GetEntry();
-        if( channel->data.parentId == newChannelEvent->userGroup.parentId &&
-            channel->data.name == newChannelEvent->userGroup.name &&
-            channel->data.type == newChannelEvent->userGroup.type)
+        case 0: groupCheckpoint = GROUP_TEXT_CHANNELS; break;
+        case 2: groupCheckpoint = GROUP_VOICE_CHANNELS; break;
+        case 4: groupCheckpoint = GROUP_CATEGORIES; break;
+        default: return false;
+    }
+
+    bool exists = false;
+    Groups::Entry* newChannel;
+    for(GroupsIterator i = m_groups->GetIterator(groupCheckpoint); !i.End(); i++)
+    {
+        newChannel = i.GetEntry();
+        if( newChannel->data.parentId == newGroupEvent->group.parentId &&
+            newChannel->data.type == newGroupEvent->group.type &&
+            newChannel->data.name == newGroupEvent->group.name)
         {
-            channel->data.id = newChannelEvent->userGroup.id;
+                newChannel->data.id = newGroupEvent->group.id;
+                exists = true;
+        }
+    }
 
-            std::map<int, int> userGroupOrder;
-            for(UserGroupsIterator userGroupIt = m_userGroups->GetIterator();
-                !userGroupIt.End(); userGroupIt++)
-            {
-                UserGroups::Entry* userGroup = userGroupIt.GetEntry();
-                if(userGroup->data.parentId == newChannelEvent->userGroup.parentId && userGroup->data.id != channel->data.id)
-                {
-                    userGroupOrder.insert(
-                        std::make_pair(
-                            userGroup->data.position >= newChannelEvent->userGroup.position ? userGroup->data.position + 1 : userGroup->data.position,
-                            userGroup->entityId
-                        )
-                    );
-                }
-            }
+    if(!exists)
+    {
+        std::vector<std::string> parameters;
+        parameters.push_back(newGroupEvent->group.id);
+        m_robotQueue->push_back(CreateDeleteChannelEvent(false, "delete-channel", parameters, newGroupEvent->channelId, newGroupEvent->guildId));
+        m_robotQueue->push_back(CreateErrorEvent(
+            "Channel creation from the left hand side panel is forbidden.\nUse the command : \"create-channel (name) (type(0=text)(2=voice) (parent_id) (position) (user_limit?)\"",
+            // HARDCODED BECAUSE SET BOT CHANNEL IS NOT IMPLEMENTED YET
+            "705503952585883810",
+            EUser,
+            ECreateChannel,
+            EForbidden
+        ));
+        return false;
+    }
 
-            channel->data.position = newChannelEvent->userGroup.position;
-            userGroupOrder.insert(std::make_pair(channel->data.position, channel->entityId));
-            AdjustChannelpositions(userGroupOrder, newChannelEvent->userGroup.parentId, newChannelEvent->channelId, newChannelEvent->guildId);
+    std::map<int, int> channelOrder;
+    for(GroupsIterator i = m_groups->GetIterator(groupCheckpoint); !i.End(); i++)
+    {
+        Groups::Entry* channel = i.GetEntry();
+        if(channel->data.parentId == newGroupEvent->group.parentId && channel->data.id != newChannel->data.id)
+        {
+            channelOrder.insert(
+                std::make_pair(
+                    channel->data.position >= newGroupEvent->group.position ? channel->data.position + 1 : channel->data.position,
+                    channel->entityId
+                )
+            );
+        }
+    }
 
+    SetGroupPositions(channelOrder, newGroupEvent->group.parentId, newGroupEvent->channelId, newGroupEvent->guildId);
+    return true;
+}
+
+bool EventManager::UpdateGroup(Event* event)
+{
+    UpdateGroupEvent* updateGroupEvent = dynamic_cast<UpdateGroupEvent*>(event);
+    
+//    if(!updateGroupEvent->fromAPI)
+//    {
+//        m_robotQueue->push_back(CreateErrorEvent(
+//            "Use of command : \"update-channel\" is forbidden",
+//            updateGroupEvent->channelId,
+//            EUser,
+//            ECreateChannel,
+//            EForbidden
+//        ));
+//        return false;
+//    }
+
+    int groupCheckpoint;
+    switch (updateGroupEvent->group.type)
+    {
+        case 0: groupCheckpoint = GROUP_TEXT_CHANNELS; break;
+        case 2: groupCheckpoint = GROUP_VOICE_CHANNELS; break;
+        case 4: groupCheckpoint = GROUP_CATEGORIES; break;
+        default: std::cout << "wut: " << updateGroupEvent->group.type << std::endl; return false;
+    }
+
+    // TODO : FORBID USERS FROM CALLING THIS COMMAND
+
+    for(GroupsIterator i = m_groups->GetIterator(groupCheckpoint); !i.End(); i++)
+    {
+        Groups::Entry* group = i.GetEntry();
+        if(group->data.id == updateGroupEvent->group.id)
+        {
+            group->data.position = updateGroupEvent->group.position;
             return true;
         }
     }
 
-    std::vector<std::string> parameters;
-    parameters.push_back(newChannelEvent->userGroup.id);
-    m_robotQueue->push_back(CreateDeleteChannelEvent(false, "delete-channel", parameters, newChannelEvent->channelId, newChannelEvent->guildId));
-
-    m_robotQueue->push_back(
-            CreateErrorEvent(
-            "Use command the command : \"create-voice-channel (channel_name) (user_limit) (parent_id) (position)\".",
-            "705503952585883810",
-            EUser,
-            EDeleteChannel,
-            EForbidden
-        )
-    );
-
+    std::cout << "SYSTEM ERROR : Channel " << updateGroupEvent->group.name << " does not exist." << std::endl;
     return false;
 }
 
@@ -109,21 +161,19 @@ bool EventManager::CreateChannel(Event* event)
 {
     CreateChannelEvent* createChannelEvent = dynamic_cast<CreateChannelEvent*>(event);
 
-    std::map<int, int> userGroupOrder;
-    for(UserGroupsIterator userGroupIt = m_userGroups->GetIterator();
-        !userGroupIt.End(); userGroupIt++)
+    int childrenCount = 0;
+    for(GroupsIterator i = m_groups->GetIterator(createChannelEvent->channel.type == 0 ? GROUP_TEXT_CHANNELS : GROUP_VOICE_CHANNELS); !i.End(); i++)
     {
-        UserGroups::Entry* userGroup = userGroupIt.GetEntry();
-        if(userGroup->data.parentId == createChannelEvent->userGroup.parentId)
+        Groups::Entry* channel = i.GetEntry();
+        // Allow name once per channel types (text and voice) and parentId
+        if(channel->data.parentId == createChannelEvent->channel.parentId)
         {
-            // Reorder channels underneath requested category
-            userGroupOrder.insert(std::make_pair(userGroup->data.position, userGroup->entityId));
-
-            // Allow name once per channel types (text and)
-            if(userGroup->data.type == createChannelEvent->userGroup.type && userGroup->data.name == createChannelEvent->userGroup.name)
+            childrenCount++;
+            if( channel->data.type == createChannelEvent->channel.type &&
+                channel->data.name == createChannelEvent->channel.name)
             {
                 m_robotQueue->push_back(CreateErrorEvent(
-                    "There is already a channel named : \"" + createChannelEvent->userGroup.name + "\"",
+                    "There is already a channel named : \"" + createChannelEvent->channel.name + "\"",
                     createChannelEvent->channelId,
                     EUser,
                     ECreateChannel,
@@ -134,81 +184,69 @@ bool EventManager::CreateChannel(Event* event)
         }
     }
 
-    m_userGroups->Add(
-        createChannelEvent->userGroup,
+    if(createChannelEvent->channel.position > childrenCount)
+        createChannelEvent->channel.position = childrenCount + 1;
+    createChannelEvent->CreateJson();
+
+    m_groups->Add(
+        createChannelEvent->channel,
         m_entityCounter->GetId(),
-        createChannelEvent->userGroup.type == 0 ? USERGROUP_TEXT_CHANNELS : USER_GROUP_VOICE_CHANNELS
+        createChannelEvent->channel.type == 0 ? GROUP_TEXT_CHANNELS : GROUP_VOICE_CHANNELS
     );
-
     return true;
-}
-
-bool EventManager::UpdateChannel(Event* event)
-{
-    UpdateVoiceChannelEvent* updateVoiceChannelEvent = dynamic_cast<UpdateVoiceChannelEvent*>(event);
-    
-    // TODO : FORBID USERS FROM CALLING THIS COMMAND
-
-    for(UserGroupsIterator userGroupIt = m_userGroups->GetIterator();
-        !userGroupIt.End(); userGroupIt++)
-    {
-        UserGroups::Entry* userGroup = userGroupIt.GetEntry();
-        if(userGroup->data.id == updateVoiceChannelEvent->userGroup.id)
-        {
-            userGroup->data.position = updateVoiceChannelEvent->userGroup.position;
-            return true;
-        }
-    }
-
-    std::cout << "SYSTEM ERROR : Channel " << updateVoiceChannelEvent->userGroup.name << " does not exist." << std::endl;
-    return false;
 }
 
 bool EventManager::DeleteChannel(Event* event)
 {
     DeleteChannelEvent* deleteChannelEvent = dynamic_cast<DeleteChannelEvent*>(event);
 
-    for(UserGroupsIterator userGroupIt = m_userGroups->GetIterator();
-        !userGroupIt.End(); userGroupIt++)
+    Groups::Entry* deleted;
+    if(!GetGroupById(deleted, deleteChannelEvent->channel.id))
     {
-        UserGroups::Entry* channel = userGroupIt.GetEntry();
-        if(channel->data.id == deleteChannelEvent->userGroup.id)
-        {
-            std::map<int, int> userGroupOrder;
-            for(UserGroupsIterator userGroupIt = m_userGroups->GetIterator();
-                !userGroupIt.End(); userGroupIt++)
-            {
-                UserGroups::Entry* userGroup = userGroupIt.GetEntry();
-                if(userGroup->data.parentId == channel->data.parentId && userGroup->data.position > channel->data.position)
-                    userGroupOrder.insert(std::make_pair(userGroup->data.position - 1, userGroup->entityId));
-                
-            }
-            m_userGroups->Remove(channel->entityId);
-            AdjustChannelpositions(userGroupOrder,deleteChannelEvent->userGroup.parentId, deleteChannelEvent->channelId, deleteChannelEvent->guildId);
-            return true;
-        }   
+        m_robotQueue->push_back(CreateErrorEvent(
+            "Channel with id " + deleteChannelEvent->channel.id + " does not exist.",
+            deleteChannelEvent->channelId,
+            EUser,
+            ECreateChannel,
+            EForbidden
+        ));
+        return false;
     }
 
-    m_robotQueue->push_back(CreateErrorEvent(
-        "Channel with id " + deleteChannelEvent->userGroup.id + " does not exist.",
-        deleteChannelEvent->channelId,
-        EUser,
-        ECreateChannel,
-        EForbidden
-    ));
+    if(deleted->data.type != 0 && deleted->data.type != 2)
+    {
+        m_robotQueue->push_back(CreateErrorEvent(
+            "Parameter 2 (type) of \"delete-channel\" must be either 0 or 2.",
+            deleteChannelEvent->channelId,
+            EUser,
+            EDeleteChannel,
+            EForbidden
+        ));
+        return false;
+    }
 
-    return false;
+    std::map<int, int> channelOrder;
+    for(GroupsIterator i = m_groups->GetIterator(deleted->data.type == 0 ? GROUP_TEXT_CHANNELS : GROUP_VOICE_CHANNELS); !i.End(); i++)
+    {
+        Groups::Entry* channel = i.GetEntry();
+        if(channel->data.parentId == deleted->data.parentId && channel->data.position > deleted->data.position)
+            channelOrder.insert(std::make_pair(channel->data.position - 1, channel->entityId));
+    }
+    m_groups->Remove(deleted->entityId);
+    SetGroupPositions(channelOrder, deleteChannelEvent->channel.parentId, deleteChannelEvent->channelId, deleteChannelEvent->guildId);
+
+    return true;
 }
 
 bool EventManager::MoveChannel(Event* event)
 {
     MoveChannelEvent* moveChannelEvent = dynamic_cast<MoveChannelEvent*>(event);
 
-    UserGroups::Entry* channel;
-    if(!GetChannelById(channel, moveChannelEvent->userGroup.id))
+    Groups::Entry* moving;
+    if(!GetGroupById(moving, moveChannelEvent->channel.id))
     {
         m_robotQueue->push_back(CreateErrorEvent(
-            "Channel with id " + moveChannelEvent->userGroup.id + " does not exist.",
+            "Channel with id " + moveChannelEvent->channel.id + " does not exist.",
             moveChannelEvent->channelId,
             EUser,
             ECreateChannel,
@@ -217,22 +255,30 @@ bool EventManager::MoveChannel(Event* event)
         return false;
     }
 
-    std::map<int, int> userGroupOrder;
-    for(UserGroupsIterator userGroupIt = m_userGroups->GetIterator();
-        !userGroupIt.End(); userGroupIt++)
+    int childrenCount = 0;
+    std::map<int, int> channelOrder;
+    for(GroupsIterator i = m_groups->GetIterator(moving->data.type == 0 ? GROUP_TEXT_CHANNELS : GROUP_VOICE_CHANNELS); !i.End(); i++)
     {
-        UserGroups::Entry* userGroup = userGroupIt.GetEntry();
-        if(userGroup->data.parentId == channel->data.parentId && userGroup->data.id != channel->data.id)
+        Groups::Entry* channel = i.GetEntry();
+        if(channel->data.parentId == moving->data.parentId)
         {
-            if(userGroup->data.position > channel->data.position && userGroup->data.position <= moveChannelEvent->userGroup.position)
-                userGroupOrder.insert(std::make_pair(userGroup->data.position - 1, userGroup->entityId));
-            else if (userGroup->data.position < channel->data.position && userGroup->data.position >= moveChannelEvent->userGroup.position)
-                userGroupOrder.insert(std::make_pair(userGroup->data.position + 1, userGroup->entityId));
+            childrenCount++;
+            if(channel->data.id != moving->data.id)
+            {
+                if(channel->data.position > moving->data.position && channel->data.position <= moveChannelEvent->channel.position)
+                    channelOrder.insert(std::make_pair(channel->data.position - 1, channel->entityId));
+                else if (channel->data.position < moving->data.position && channel->data.position >= moveChannelEvent->channel.position)
+                    channelOrder.insert(std::make_pair(channel->data.position + 1, channel->entityId));
+            }
         }
     }
 
-    userGroupOrder.insert(std::make_pair(moveChannelEvent->userGroup.position, channel->entityId));
-    AdjustChannelpositions(userGroupOrder,moveChannelEvent->userGroup.parentId, moveChannelEvent->channelId, moveChannelEvent->guildId);
+    if(moveChannelEvent->channel.position > childrenCount)
+        moveChannelEvent->channel.position = childrenCount;
+    moveChannelEvent->CreateJson();
+
+    channelOrder.insert(std::make_pair(moveChannelEvent->channel.position, moving->entityId));
+    SetGroupPositions(channelOrder, moveChannelEvent->channel.parentId, moveChannelEvent->channelId, moveChannelEvent->guildId);
 
     return true;
 }
@@ -241,36 +287,118 @@ bool EventManager::CreateCategory(Event* event)
 {
     CreateCategoryEvent* createCategoryEvent = dynamic_cast<CreateCategoryEvent*>(event);
 
+    int childrenCount = 0;
+    for(GroupsIterator i = m_groups->GetIterator(GROUP_CATEGORIES); !i.End(); i++)
+    {
+        Groups::Entry* channel = i.GetEntry();
+        // Allow name once per channel types (text and voice) and parentId
+        if(channel->data.parentId == createCategoryEvent->category.parentId)
+        {
+            childrenCount++;
+            if( channel->data.type == createCategoryEvent->category.type &&
+                channel->data.name == createCategoryEvent->category.name)
+            {
+                m_robotQueue->push_back(CreateErrorEvent(
+                    "There is already a channel named : \"" + createCategoryEvent->category.name + "\"",
+                    createCategoryEvent->channelId,
+                    EUser,
+                    ECreateChannel,
+                    EForbidden
+                ));
+                return false;
+            }
+        }
+    }
+
+    if(createCategoryEvent->category.position > childrenCount)
+        createCategoryEvent->category.position = childrenCount + 1;
+    createCategoryEvent->CreateJson();
+
+    m_groups->Add(
+        createCategoryEvent->category,
+        m_entityCounter->GetId(),
+        GROUP_CATEGORIES
+    );
     return true;
 }
 
-void EventManager::AdjustChannelpositions(std::map<int,int>& userGroupOrder, std::string parentId, std::string channelId, std::string guildId)
+bool EventManager::MoveCategory(Event* event)
+{
+    MoveCategoryEvent* moveCategoryEvent = dynamic_cast<MoveCategoryEvent*>(event);
+
+    Groups::Entry* moving;
+    if(!GetGroupById(moving, moveCategoryEvent->category.id))
+    {
+        m_robotQueue->push_back(CreateErrorEvent(
+            "Channel with id " + moveCategoryEvent->category.id + " does not exist.",
+            moveCategoryEvent->channelId,
+            EUser,
+            ECreateChannel,
+            EForbidden
+        ));
+        return false;
+    }
+
+    int childrenCount = 0;
+    std::map<int, int> categoryOrder;
+    for(GroupsIterator i = m_groups->GetIterator(GROUP_CATEGORIES); !i.End(); i++)
+    {
+        Groups::Entry* category = i.GetEntry();
+        if(category->data.parentId == moving->data.parentId)
+        {
+            childrenCount++;
+            if(category->data.id != moving->data.id)
+            {
+                if(category->data.position > moving->data.position && category->data.position <= moveCategoryEvent->category.position)
+                    categoryOrder.insert(std::make_pair(category->data.position - 1, category->entityId));
+                else if (category->data.position < moving->data.position && category->data.position >= moveCategoryEvent->category.position)
+                    categoryOrder.insert(std::make_pair(category->data.position + 1, category->entityId));
+            }
+        }
+    }
+
+    if(moveCategoryEvent->category.position > childrenCount)
+        moveCategoryEvent->category.position = childrenCount;
+    moveCategoryEvent->CreateJson();
+
+
+    categoryOrder.insert(std::make_pair(moveCategoryEvent->category.position, moving->entityId));
+    SetGroupPositions(categoryOrder, moveCategoryEvent->category.parentId, moveCategoryEvent->channelId, moveCategoryEvent->guildId);
+
+    return true;
+}
+
+void EventManager::SetGroupPositions(std::map<int,int>& channelOrder, std::string parentId, std::string channelId, std::string guildId)
 {
     int next = 1;
-    for (std::map<int, int>::iterator it = userGroupOrder.begin(); it != userGroupOrder.end(); it++, next++)
+    std::cout << channelOrder.size() << std::endl;
+    for (std::map<int, int>::reverse_iterator i = channelOrder.rbegin(); i != channelOrder.rend(); i++, next++)
     {
-        UserGroups::Row userGroup = m_userGroups->GetById(it->second);
-        if(userGroup.data->position != next)
+
+        Groups::Row group = m_groups->GetById(i->second);
+        if(group.data->position != i->first)
         {
+            std::cout << group.data->name << "'s new position is " << i->first << std::endl;
             std::vector<std::string> parameters;
-            parameters.push_back(userGroup.data->id);
-            parameters.push_back(std::to_string(next));
-            m_robotQueue->push_back(CreateUpdateChannelEvent(false, "update-voice-channel", parameters, channelId, guildId));
-            m_userGroups->GetById(it->second).data->position = next;
+            parameters.push_back(group.data->id);
+            parameters.push_back(std::to_string(group.data->type));
+            parameters.push_back(std::to_string(i->first));
+            m_robotQueue->push_back(CreateUpdateGroupEvent(false, "update-group", parameters, channelId, guildId));
+            m_groups->GetById(i->second).data->position = i->first;
         }
     }
 }
 
-bool EventManager::GetChannelById(UserGroups::Entry*& userGroup, std::string id)
+bool EventManager::GetGroupById(Groups::Entry*& group, std::string id)
 {
-    for(UserGroupsIterator userGroupIt = m_userGroups->GetIterator();
+    for(GroupsIterator userGroupIt = m_groups->GetIterator();
         !userGroupIt.End(); userGroupIt++)
     {
-        userGroup = userGroupIt.GetEntry();
-        if(userGroup->data.id == id)
+        group = userGroupIt.GetEntry();
+        if(group->data.id == id)
             return true;
     }
 
-    userGroup = NULL;
+    group = NULL;
     return false;
 }

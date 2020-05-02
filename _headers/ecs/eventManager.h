@@ -17,7 +17,7 @@
 #include "componentArray.h"
 
 // Components
-#include "userGroupComponent.h"
+#include "groupComponent.h"
 
 // Misc
 #include "definitions.h"
@@ -27,19 +27,20 @@ class EventManager
 public:
     EventManager() { }
     ~EventManager();
-    void Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, UserGroups& userGroups);
+    void Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Groups& groups);
     bool HandleEvent(Event* event);
-    bool NewChannel(Event* event);
+    bool NewGroup(Event* event);
+    bool UpdateGroup(Event* event);
     bool CreateChannel(Event* event);
-    bool UpdateChannel(Event* event);
     bool DeleteChannel(Event* event);
     bool MoveChannel(Event* event);
     bool CreateCategory(Event* event);
-    void AdjustChannelpositions(std::map<int,int>& userGroupOrder, std::string parentId, std::string channelId, std::string guildId);
-    bool GetChannelById(UserGroups::Entry*& userGroup, std::string id);
+    bool MoveCategory(Event* event);
+    void SetGroupPositions(std::map<int,int>& channelOrder, std::string parentId, std::string channelId, std::string guildId);
+    bool GetGroupById(Groups::Entry*& group, std::string id);
 private:
     // Components
-    UserGroups* m_userGroups;
+    Groups* m_groups;
 
     EntityCounter* m_entityCounter;
     SharedQueue<Event*>* m_robotQueue;

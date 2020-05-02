@@ -1,25 +1,24 @@
-#ifndef USER_GROUP_H__
-#define USER_GROUP_H__
+#ifndef GROUP_COMPONENT_H__
+#define GROUP_COMPONENT_H__
 
 #include <string>
 #include <vector>
 
-struct UserGroupComponent {
+struct GroupComponent {
 public:
-    UserGroupComponent() { }
-    UserGroupComponent(const uint maxUsers)
+    GroupComponent() { }
+    GroupComponent(const uint maxUsers)
     { 
         this->userLimit = maxUsers;
     }
-    ~UserGroupComponent() { }
+    ~GroupComponent() { }
     std::string id;
-    int type;
-    std::string name;
-    int userLimit;
     std::string parentId;
+    std::string name;
+    int type;
+    int userLimit;
     int position;
     std::vector<std::string> userIds;
-
 private:
 };
 

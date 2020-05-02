@@ -1,15 +1,15 @@
 #ifndef DEFINITIONS_H__
 #define DEFINITIONS_H__
 
-#include "userGroupComponent.h"
+#include "groupComponent.h"
 
 #include "componentArray.h"
 
 //typedef ComponentArray<OffenseComponent, 476, 8> Offenses;
-typedef ComponentArray<UserGroupComponent, 40, 2> UserGroups;
+typedef ComponentArray<GroupComponent, 50, 3> Groups;
 
-typedef UserGroups::Iterator UserGroupsIterator;
+typedef Groups::Iterator GroupsIterator;
 
-enum UserGroupsCheckpointIndexes { USERGROUP_TEXT_CHANNELS = 0, USER_GROUP_VOICE_CHANNELS, USER_GROUPS_CHECKPOINTS_SIZE };
+enum GroupCheckpoint { GROUP_CATEGORIES = 0, GROUP_TEXT_CHANNELS, GROUP_VOICE_CHANNELS, GROUP_CHECKPOINTS_SIZE };
 
 #endif

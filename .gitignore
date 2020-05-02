@@ -11,4 +11,4 @@ CTestTestfile.cmake
 _deps
 token.dat
 *.a
-mia_bot
+build/

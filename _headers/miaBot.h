@@ -12,7 +12,7 @@
 #include "eventTranslator.h"
 
 // Components
-#include "userGroupComponent.h"
+#include "groupComponent.h"
 
 // ECS
 #include "ecs.h"
@@ -34,7 +34,7 @@ private:
     SharedQueue<Event*>* m_humanQueue;
 
     // Components
-    UserGroups m_userGroups;
+    Groups m_groups;
 
 	// Misc
 	EntityCounter m_entityCounter;

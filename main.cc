@@ -95,7 +95,7 @@ int main()
 			[&bot, &self](json msg) {
 				mia->QueueCommand(
 					true,
-					"new-channel",
+					"new-group",
 					msg["name"].get<std::string>() + " " +
 					(msg["parent_id"].is_null() ? "" : msg["parent_id"].get<std::string>()) + " " +
 					msg["id"].get<std::string>() + " " +
