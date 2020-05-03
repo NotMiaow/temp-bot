@@ -287,6 +287,37 @@ struct CreateCategoryEvent : public Event
 	GroupComponent category;
 };
 
+struct DeleteCategoryEvent : public Event
+{
+	DeleteCategoryEvent(bool deletionQueued, std::string method, std::string type, std::string channelId, std::string guildId, GroupComponent channel)
+	{
+		this->deletionQueued = deletionQueued;
+		this->fromAPI = false;
+		this->method = method;
+		this->type = type;
+		this->channelId = channelId;
+		this->guildId = guildId;
+		this->category = channel;
+		CreateJson();
+	}
+	bool ReadOnly() const { return false; }
+	bool WaitForResponse() const { return true; }
+	EEventType GetType() const { return EDeleteCategory; }
+	void CreateJson()
+	{
+		this->content = { };
+	}
+	std::string ToDebuggable() const
+	{
+		std::ostringstream os;
+		os << '{' << EDeleteCategory << ';' << category.id << '}';
+		return os.str();
+	}
+
+	GroupComponent category;
+	bool deletionQueued;
+};
+
 struct MoveCategoryEvent : public Event
 {
 	MoveCategoryEvent(bool fromAPI, std::string channelId, std::string guildId, GroupComponent category)

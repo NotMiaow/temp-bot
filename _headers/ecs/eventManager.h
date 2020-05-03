@@ -35,6 +35,7 @@ public:
     bool DeleteChannel(Event* event);
     bool MoveChannel(Event* event);
     bool CreateCategory(Event* event);
+    bool DeleteCategory(Event* event);
     bool MoveCategory(Event* event);
     void SetGroupPositions(std::map<int,int>& channelOrder, std::string parentId, std::string channelId, std::string guildId);
     bool GetGroupById(Groups::Entry*& group, std::string id);

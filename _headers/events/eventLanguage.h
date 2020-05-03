@@ -21,7 +21,7 @@ enum EEventType
 	EDeleteChannel,
 	EMoveChannel,
 	ECreateCategory,
-	EUpdateCategory,
+	EDeleteCategory,
 	EMoveCategory
 };
 
@@ -44,6 +44,7 @@ static const std::map<std::string, EEventType> optionEventTypes {
 	{ "delete-channel", EDeleteChannel },
 	{ "move-channel", EMoveChannel },
 	{ "create-category", ECreateCategory },
+	{ "delete-category", EDeleteCategory },
 	{ "move-category", EMoveCategory }
 };
 

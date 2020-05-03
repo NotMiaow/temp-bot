@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <ctype.h>
+#include <sstream>
 
 #include <nlohmann/json.hpp>
 
@@ -219,6 +220,33 @@ static Event* CreateCreateCategoryEvent(bool fromAPI, std::string command, std::
 	return e;
 }
 
+static Event* CreateDeleteCategoryEvent(bool fromAPI, std::string command, std::vector<std::string> parameters, std::string channelId, std::string guildId)
+{
+	std::string seeSignature = "\nSee signature : \"" + command + " (id)\"";
+
+	if(parameters.size() < 1 || parameters.size() > 2)
+		return CreateErrorEvent(
+			"Wrong parameter amount." + seeSignature,
+			channelId, EUser, ECreateChannel, EWrongParemeterAmount
+		);
+
+    std::string method = "DELETE";
+    std::string type = "/channels/";
+	GroupComponent category;
+	category.id = parameters[0];
+	type += parameters[0];
+
+	bool deletionQueued = false;
+	if(parameters.size() == 2)
+		std::istringstream(parameters[1]) >> deletionQueued;
+	
+	if(deletionQueued)
+		std::cout << "success" << std::endl;
+
+	Event* e = new DeleteCategoryEvent(deletionQueued, method, type, channelId, guildId, category);
+	return e;
+}
+
 static Event* CreateMoveCategoryEvent(bool fromAPI, std::string command, std::vector<std::string> parameters, std::string channelId, std::string guildId)
 {
 	std::string seeSignature = "\nSee signature : \"" + command + " (id) (position)\"";
@@ -264,6 +292,8 @@ static Event* CreateEvent(bool fromAPI, std::string command, std::string content
 			return CreateMoveChannelEvent(fromAPI, command, parameters, channelId, guildId);
 		case ECreateCategory:
 			return CreateCreateCategoryEvent(fromAPI, command, parameters, channelId, guildId);
+		case EDeleteCategory:
+			return CreateDeleteCategoryEvent(fromAPI, command, parameters, channelId, guildId);
 		case EMoveCategory:
 			return CreateMoveCategoryEvent(fromAPI,command, parameters, channelId, guildId);
 		default:

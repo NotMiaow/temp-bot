@@ -35,6 +35,8 @@ bool EventManager::HandleEvent(Event* event)
         return MoveChannel(event);
     case ECreateCategory:
         return CreateCategory(event);
+    case EDeleteCategory:
+        return DeleteCategory(event);
     case EMoveCategory:
         return MoveCategory(event);
     default:
@@ -216,7 +218,7 @@ bool EventManager::DeleteChannel(Event* event)
     if(deleted->data.type != 0 && deleted->data.type != 2)
     {
         m_robotQueue->push_back(CreateErrorEvent(
-            "Parameter 2 (type) of \"delete-channel\" must be either 0 or 2.",
+            "Command \"delete-channel\" can only be used to delete text and voice channels.",
             deleteChannelEvent->channelId,
             EUser,
             EDeleteChannel,
@@ -320,6 +322,91 @@ bool EventManager::CreateCategory(Event* event)
         GROUP_CATEGORIES
     );
     return true;
+}
+
+bool EventManager::DeleteCategory(Event* event)
+{
+    DeleteCategoryEvent* deleteCategoryEvent = dynamic_cast<DeleteCategoryEvent*>(event);
+
+    Groups::Entry* deleted;
+    if(!GetGroupById(deleted, deleteCategoryEvent->category.id))
+    {
+        m_robotQueue->push_back(CreateErrorEvent(
+            "Category with id " + deleteCategoryEvent->category.id + " does not exist.",
+            deleteCategoryEvent->channelId,
+            EUser,
+            ECreateChannel,
+            EForbidden
+        ));
+        return false;
+    }
+
+    if(deleted->data.type != 4)
+    {
+        m_robotQueue->push_back(CreateErrorEvent(
+            "Command \"delete-category\" can only be used to delete categories.",
+            deleteCategoryEvent->channelId,
+            EUser,
+            EDeleteChannel,
+            EForbidden
+        ));
+        return false;
+    }
+
+    if(deleteCategoryEvent->deletionQueued)
+    {
+        std::map<int, int> categoryOrder;
+        for(GroupsIterator i = m_groups->GetIterator(deleted->data.type == 0 ? GROUP_TEXT_CHANNELS : GROUP_VOICE_CHANNELS); !i.End(); i++)
+        {
+            Groups::Entry* channel = i.GetEntry();
+            if(channel->data.parentId == deleted->data.parentId && channel->data.position > deleted->data.position)
+                categoryOrder.insert(std::make_pair(channel->data.position - 1, channel->entityId));
+        }
+
+        m_groups->Remove(deleted->entityId);
+        SetGroupPositions(categoryOrder, deleteCategoryEvent->category.parentId, deleteCategoryEvent->channelId, deleteCategoryEvent->guildId);
+        return true;
+    }
+
+    // Get text channels to be deleted
+    std::map<int, std::string> textChannelsDeletionOrder;
+    for(GroupsIterator i = m_groups->GetIterator(GROUP_TEXT_CHANNELS); !i.End(); i++)
+    {
+        Groups::Entry* channel = i.GetEntry();
+        if(channel->data.parentId == deleted->data.id)
+            textChannelsDeletionOrder.insert(std::make_pair(channel->data.position, channel->data.id));
+    }
+
+    // Get voice channels to be deleted
+    std::map<int, std::string> voiceChannelsDeletionOrder;
+    for(GroupsIterator i = m_groups->GetIterator(GROUP_VOICE_CHANNELS); !i.End(); i++)
+    {
+        Groups::Entry* channel = i.GetEntry();
+        if(channel->data.parentId == deleted->data.id)
+            voiceChannelsDeletionOrder.insert(std::make_pair(channel->data.position, channel->data.id));
+    }
+
+    // Queue deletion of the category's channels by reverse order of position
+    // Reverse order saves up alot on command load.
+    for (std::map<int, std::string>::reverse_iterator i = textChannelsDeletionOrder.rbegin(); i != textChannelsDeletionOrder.rend(); i++)
+    {
+        std::vector<std::string> parameters;
+        parameters.push_back(i->second);
+        m_robotQueue->push_back(CreateDeleteChannelEvent(false, "delete-channel", parameters, deleteCategoryEvent->channelId, deleteCategoryEvent->guildId));
+    }
+
+    for (std::map<int, std::string>::reverse_iterator i = voiceChannelsDeletionOrder.rbegin(); i != voiceChannelsDeletionOrder.rend(); i++)
+    {
+        std::vector<std::string> parameters;
+        parameters.push_back(i->second);
+        m_robotQueue->push_back(CreateDeleteChannelEvent(false, "delete-channel", parameters, deleteCategoryEvent->channelId, deleteCategoryEvent->guildId));
+    }
+
+    std::vector<std::string> parameters;
+    parameters.push_back(deleteCategoryEvent->category.id);
+    parameters.push_back("1");
+    m_robotQueue->push_back(CreateDeleteCategoryEvent(false, "delete-channel", parameters, deleteCategoryEvent->channelId, deleteCategoryEvent->guildId));
+    return false;
 }
 
 bool EventManager::MoveCategory(Event* event)
