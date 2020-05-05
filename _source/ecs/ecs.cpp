@@ -5,9 +5,11 @@ ECS::~ECS()
 
 }
 
-void ECS::Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Groups& groups)
+void ECS::Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Lobbies& lobbies, Preparations& preparations, Groups& groups)
 {
     //Components
+    m_lobbies = &lobbies;
+    m_preparations = &preparations;
     m_groups = &groups;
 
     m_robotQueue = &robotQueue;

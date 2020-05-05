@@ -17,17 +17,21 @@
 //Systems
 #include "timeSystem.h"
 
+#include "definitions.h"
+
 class ECS
 {
 public:
 	ECS() {}
 	~ECS();
-	void Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Groups& groups);
+	void Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Lobbies& lobbies, Preparations& preparations, Groups& groups);
 	void Loop();
 private:
 	void WaitForTerminate();
 private:
 	//Components
+	Lobbies* m_lobbies;
+	Preparations* m_preparations;
 	Groups* m_groups;
 	
 	//Shared resources

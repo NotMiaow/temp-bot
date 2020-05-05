@@ -8,6 +8,8 @@
 #include <nlohmann/json.hpp>
 
 // Components
+#include "preparationComponent.h"
+#include "lobbyComponent.h"
 #include "groupComponent.h"
 
 #include "eventLanguage.h"
@@ -15,11 +17,11 @@
 struct Event
 {
 	virtual bool ReadOnly() const = 0;
-	virtual bool WaitForResponse() const = 0;
 	virtual EEventType GetType() const = 0;
 	virtual void CreateJson() = 0;
 	virtual std::string ToDebuggable() const = 0;
 
+	bool waitForResponse;
 	bool fromAPI;
     std::string method;
     std::string type;
@@ -32,7 +34,9 @@ struct ErrorEvent : public Event
 {
 	ErrorEvent(std::string message, std::string channelId, EOffender eOffender, EEventType eType, EErrorType geType)
 	{
+		this->waitForResponse = false;
 		fromAPI = false;
+
 		this->eOffender = eOffender;
 		this->eType = eType;
 		this->geType = geType;
@@ -40,12 +44,8 @@ struct ErrorEvent : public Event
 		this->channelId = channelId;
 	}
 	bool ReadOnly() const { return false; }
-	bool WaitForResponse() const { return false; }
 	EEventType GetType() const { return EError; }
-	void CreateJson()
-	{
-
-	}
+	void CreateJson() { }
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
@@ -63,15 +63,12 @@ struct EmptyEvent : public Event
 {
 	EmptyEvent()
 	{
+		this->waitForResponse = false;
 		fromAPI = true;
 	}
 	bool ReadOnly() const { return true; }
-	bool WaitForResponse() const { return false; }
 	EEventType GetType() const { return EEmpty; }
-	void CreateJson()
-	{
-
-	}
+	void CreateJson() {	}
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
@@ -84,10 +81,10 @@ struct ShutdownEvent : public Event
 {
 	ShutdownEvent()
 	{
+		this->waitForResponse = false;
 		fromAPI = false;
 	}
 	bool ReadOnly() const { return false; }
-	bool WaitForResponse() const { return false; }
 	EEventType GetType() const { return EShutdown; }
 	void CreateJson()
 	{
@@ -105,14 +102,15 @@ struct NewGroupEvent : public Event
 {
 	NewGroupEvent(bool fromAPI, std::string channelId, std::string guildId, GroupComponent group)
 	{
+		this->waitForResponse = false;
+		this->fromAPI = fromAPI;
+
 		this->channelId = channelId;
 		this->guildId = guildId;
-		this->fromAPI = fromAPI;
 		this->group = group;
 		CreateJson();
 	}
 	bool ReadOnly() const { return true; }
-	bool WaitForResponse() const { return false; }
 	EEventType GetType() const { return ENewGroup; }
 	void CreateJson()
 	{
@@ -132,16 +130,17 @@ struct UpdateGroupEvent : public Event
 {
 	UpdateGroupEvent(bool fromAPI, std::string method, std::string type, std::string channelId, std::string guildId, GroupComponent group)
 	{
+		this->waitForResponse = true;
 		this->fromAPI = fromAPI;
 		this->method = method;
 		this->type = type;
+
 		this->channelId = channelId;
 		this->guildId = guildId;
 		this->group = group;
 		CreateJson();
 	}
 	bool ReadOnly() const { return false; }
-	bool WaitForResponse() const { return true; }
 	EEventType GetType() const { return EUpdateGroup; }
 	void CreateJson()
 	{
@@ -163,16 +162,17 @@ struct CreateChannelEvent : public Event
 {
 	CreateChannelEvent(bool fromAPI, std::string method, std::string type, std::string channelId, std::string guildId, GroupComponent channel)
 	{
+		this->waitForResponse = true;
 		this->fromAPI = fromAPI;
 		this->method = method;
 		this->type = type;
+		
 		this->channelId = channelId;
 		this->guildId = guildId;
 		this->channel = channel;
 		CreateJson();
 	}
 	bool ReadOnly() const { return false; }
-	bool WaitForResponse() const { return true; }
 	EEventType GetType() const { return ECreateChannel; }
 	void CreateJson()
 	{
@@ -199,16 +199,17 @@ struct DeleteChannelEvent : public Event
 {
 	DeleteChannelEvent(bool fromAPI, std::string method, std::string type, std::string channelId, std::string guildId, GroupComponent channel)
 	{
+		this->waitForResponse = true;
 		this->fromAPI = fromAPI;
 		this->method = method;
 		this->type = type;
+
 		this->channelId = channelId;
 		this->guildId = guildId;
 		this->channel = channel;
 		CreateJson();
 	}
 	bool ReadOnly() const { return false; }
-	bool WaitForResponse() const { return true; }
 	EEventType GetType() const { return EDeleteChannel; }
 	void CreateJson()
 	{
@@ -228,16 +229,17 @@ struct MoveChannelEvent : public Event
 {
 	MoveChannelEvent(bool fromAPI, std::string channelId, std::string guildId, GroupComponent channel)
 	{
+		this->waitForResponse = false;
 		this->fromAPI = fromAPI;
 		this->method = method;
 		this->type = type;
+
 		this->channelId = channelId;
 		this->guildId = guildId;
 		this->channel = channel;
 		CreateJson();
 	}
 	bool ReadOnly() const { return true; }
-	bool WaitForResponse() const { return true; }
 	EEventType GetType() const { return EMoveChannel; }
 	void CreateJson()
 	{
@@ -257,16 +259,17 @@ struct CreateCategoryEvent : public Event
 {
 	CreateCategoryEvent(bool fromAPI, std::string method, std::string type, std::string channelId, std::string guildId, GroupComponent category)
 	{
+		this->waitForResponse = true;
 		this->fromAPI = fromAPI;
 		this->method = method;
 		this->type = type;
+
 		this->channelId = channelId;
 		this->guildId = guildId;
 		this->category = category;
 		CreateJson();
 	}
 	bool ReadOnly() const { return false; }
-	bool WaitForResponse() const { return true; }
 	EEventType GetType() const { return ECreateCategory; }
 	void CreateJson()
 	{
@@ -291,17 +294,18 @@ struct DeleteCategoryEvent : public Event
 {
 	DeleteCategoryEvent(bool deletionQueued, std::string method, std::string type, std::string channelId, std::string guildId, GroupComponent channel)
 	{
-		this->deletionQueued = deletionQueued;
+		this->waitForResponse = deletionQueued;
 		this->fromAPI = false;
 		this->method = method;
 		this->type = type;
+
+		this->deletionQueued = deletionQueued;
 		this->channelId = channelId;
 		this->guildId = guildId;
 		this->category = channel;
 		CreateJson();
 	}
 	bool ReadOnly() const { return false; }
-	bool WaitForResponse() const { return true; }
 	EEventType GetType() const { return EDeleteCategory; }
 	void CreateJson()
 	{
@@ -322,16 +326,17 @@ struct MoveCategoryEvent : public Event
 {
 	MoveCategoryEvent(bool fromAPI, std::string channelId, std::string guildId, GroupComponent category)
 	{
+		this->waitForResponse = false;
 		this->fromAPI = fromAPI;
-		this->method = method;
-		this->type = type;
+		this->method = "";
+		this->type = "";
+
 		this->channelId = channelId;
 		this->guildId = guildId;
 		this->category = category;
 		CreateJson();
 	}
 	bool ReadOnly() const { return true; }
-	bool WaitForResponse() const { return true; }
 	EEventType GetType() const { return EMoveCategory; }
 	void CreateJson()
 	{
@@ -345,6 +350,78 @@ struct MoveCategoryEvent : public Event
 	}
 
 	GroupComponent category;
+};
+
+struct MoveUserEvent : public Event
+{
+	MoveUserEvent(bool fromAPI, std::string method, std::string type, std::string channelId, std::string guildId, GroupComponent voiceChannel)
+	{
+		this->waitForResponse = false;
+		this->fromAPI = fromAPI;
+		this->method = method;
+		this->type = type;
+
+		this->channelId = channelId;
+		this->guildId = guildId;
+		this->voiceChannel = voiceChannel;
+		CreateJson();
+	}
+	bool ReadOnly() const { return false; }
+	EEventType GetType() const { return EMoveUser; }
+	void CreateJson()
+	{
+		this->content = { 
+			{ "channel_id", voiceChannel.id }
+		};
+	}
+	std::string ToDebuggable() const
+	{
+		std::ostringstream os;
+		os << '{' << EMoveUser << ';' << channelId  << ';' << guildId << ';' << voiceChannel.id << ';' << voiceChannel.userIds[0]  << '}';
+		return os.str();
+	}
+
+	GroupComponent voiceChannel;
+};
+
+struct CreateMatchEvent : public Event
+{
+	CreateMatchEvent(std::string channelId, std::string guildId,
+		int creationStep, std::string matchId, std::string matchName, int userCount, std::vector<std::string> userIds)
+	{
+		this->waitForResponse = false;
+		this->fromAPI = false;
+		this->method = "";
+		this->type = "";
+
+		this->channelId = channelId;
+		this->guildId = guildId;
+		this->creationStep = creationStep;
+		this->matchId = matchId;
+		this->matchName = matchName;
+		this->userCount = userCount;
+		this->userIds = userIds;
+		CreateJson();
+	}
+
+	bool ReadOnly() const { return true; }
+	EEventType GetType() const { return ECreateMatch; }
+	void CreateJson()
+	{
+		this->content = { };
+	}
+	std::string ToDebuggable() const
+	{
+		std::ostringstream os;
+		os << '{' << ECreateMatch << ';' << channelId  << ';' << guildId << ';' << creationStep << ';'<< matchId << ';'<< matchName << ';' << userCount << '}';
+		return os.str();
+	}
+
+	int creationStep;
+	std::string matchId;
+	std::string matchName;
+	int userCount;
+	std::vector<std::string> userIds;
 };
 
 #endif

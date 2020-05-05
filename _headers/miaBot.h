@@ -12,6 +12,8 @@
 #include "eventTranslator.h"
 
 // Components
+#include "lobbyComponent.h"
+#include "preparationComponent.h"
 #include "groupComponent.h"
 
 // ECS
@@ -34,6 +36,8 @@ private:
     SharedQueue<Event*>* m_humanQueue;
 
     // Components
+    Lobbies m_lobbies;
+    Preparations m_preparations;
     Groups m_groups;
 
 	// Misc

@@ -102,10 +102,13 @@ static Event* CreateCreateChannelEvent(bool fromAPI, std::string command, std::v
 	for(int i = 0; i < channel.name.length(); i++)
 	{
 		if(!isalnum(channel.name[i]) && channel.name[i] != '-')
+		{
+			std::cout << "FORBIDDEN_CHARACTER: " << channel.name[i] << std::endl;
 			return CreateErrorEvent(
 				"Parameter 1 (name) of " + command + " must be composed of only alphanumeric caracters and '-'." + seeSignature,
 				channelId, EUser, ECreateChannel, EWrongParameterType
 			);
+		}
 	}
 
 	if(!ToInt(parameters[1], channel.type))
@@ -222,9 +225,9 @@ static Event* CreateCreateCategoryEvent(bool fromAPI, std::string command, std::
 
 static Event* CreateDeleteCategoryEvent(bool fromAPI, std::string command, std::vector<std::string> parameters, std::string channelId, std::string guildId)
 {
-	std::string seeSignature = "\nSee signature : \"" + command + " (id)\"";
+	std::string seeSignature = "\nSee signature : \"" + command + " (id) (deletion_queued)\"";
 
-	if(parameters.size() < 1 || parameters.size() > 2)
+	if(parameters.size() != 2)
 		return CreateErrorEvent(
 			"Wrong parameter amount." + seeSignature,
 			channelId, EUser, ECreateChannel, EWrongParemeterAmount
@@ -236,12 +239,9 @@ static Event* CreateDeleteCategoryEvent(bool fromAPI, std::string command, std::
 	category.id = parameters[0];
 	type += parameters[0];
 
-	bool deletionQueued = false;
+	bool deletionQueued;
 	if(parameters.size() == 2)
 		std::istringstream(parameters[1]) >> deletionQueued;
-	
-	if(deletionQueued)
-		std::cout << "success" << std::endl;
 
 	Event* e = new DeleteCategoryEvent(deletionQueued, method, type, channelId, guildId, category);
 	return e;
@@ -264,6 +264,61 @@ static Event* CreateMoveCategoryEvent(bool fromAPI, std::string command, std::ve
 		return CreateErrorEvent("Parameter 2 (new channel position) of " + command + " must be an integral number.", channelId, EUser, EMoveCategory, EWrongParameterType);
 
 	Event* e = new MoveCategoryEvent(fromAPI, channelId, guildId, category);
+	return e;
+}
+
+static Event* CreateMoveUserEvent(bool fromAPI, std::string command, std::vector<std::string> parameters, std::string channelId, std::string guildId)
+{
+	std::string seeSignature = "\nSee signature : \"" + command + " (user_id) (channel_id)\"";
+
+	if(parameters.size() != 2)
+		return CreateErrorEvent(
+			"Wrong parameter amount." + seeSignature,
+			channelId, EUser, EMoveUser, EWrongParemeterAmount
+		);
+
+    std::string method = "PATCH";
+    std::string type = "/guilds/" + guildId + "/members/" + parameters[0];
+	GroupComponent voiceChannel;
+	voiceChannel.id = parameters[1];
+	voiceChannel.userIds.push_back(parameters[0]);
+
+	Event* e = new MoveUserEvent(fromAPI, method, type, channelId, guildId, voiceChannel);
+	return e;
+}
+
+static Event* CreateCreateMatchEvent(bool fromAPI, std::string command, std::vector<std::string> parameters, std::string channelId, std::string guildId)
+{
+	std::string seeSignature = "\nSee signature : \"" + command + " (creation_step) (game_id) (game_name) (user_count) (user_id) (...) (user_id)\"";
+
+	if(parameters.size() < 4)
+		return CreateErrorEvent(
+			"Wrong parameter amount." + seeSignature,
+			channelId, EUser, ECreateMatch, EWrongParemeterAmount
+		);
+
+	int creationStep;
+	std::string gameId = parameters[1];
+	std::string gameName = parameters[2];
+	int userCount;
+	std::vector<std::string> userIds;
+
+	if(!ToInt(parameters[0], creationStep))
+		return CreateErrorEvent("Parameter 1 (creation_step) of " + command + " must be an integral number.", channelId, EUser, ECreateMatch, EWrongParameterType);
+	
+	if(!ToInt(parameters[3], userCount))
+		return CreateErrorEvent("Parameter 4 (user_count) of " + command + " must be an integral number.", channelId, EUser, ECreateMatch, EWrongParameterType);
+
+	if(parameters.size() != 4 + userCount)
+		return CreateErrorEvent(
+			"Wrong parameter amount." + seeSignature,
+			channelId, EUser, ECreateMatch, EWrongParemeterAmount
+		);
+	
+	for(int i = 3; i < 3 + userCount; i++)
+		userIds.push_back(parameters[i]);
+
+	Event* e = new CreateMatchEvent(channelId, guildId, creationStep, gameId, gameName, userCount, userIds);
 	return e;
 }
 
@@ -295,7 +350,11 @@ static Event* CreateEvent(bool fromAPI, std::string command, std::string content
 		case EDeleteCategory:
 			return CreateDeleteCategoryEvent(fromAPI, command, parameters, channelId, guildId);
 		case EMoveCategory:
-			return CreateMoveCategoryEvent(fromAPI,command, parameters, channelId, guildId);
+			return CreateMoveCategoryEvent(fromAPI, command, parameters, channelId, guildId);
+		case EMoveUser:
+			return CreateMoveUserEvent(fromAPI, command, parameters, channelId, guildId);
+		case ECreateMatch:
+			return CreateCreateMatchEvent(fromAPI, command, parameters, channelId, guildId);
 		default:
 			return CreateErrorEvent("This command does not exist.", channelId, EUser, ECreateEvent, EWrongEventType);
 		}

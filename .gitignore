@@ -12,3 +12,5 @@ _deps
 token.dat
 *.a
 build/
+
+.vscode/

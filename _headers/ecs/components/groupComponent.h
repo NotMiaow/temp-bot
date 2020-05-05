@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-struct GroupComponent {
-public:
+struct GroupComponent
+{
     GroupComponent() { }
     GroupComponent(const uint maxUsers)
     { 
@@ -19,7 +19,6 @@ public:
     int userLimit;
     int position;
     std::vector<std::string> userIds;
-private:
 };
 
 #endif

@@ -261,11 +261,14 @@ namespace discordpp{
 			{
 				std::ostringstream ss;
 				ss << res_->body();
-				if(ss.str().at(0) != '{'){
-					std::cerr << "Discord replied:\n" << ss.str() << "\nTo the following target:\n" << target
-					          << "\nWith the following payload:\n" << payload << std::endl;
-				}else{
-					jres = json::parse(ss.str());
+				const std::string& body = ss.str();
+				if(!body.empty()){
+					if(body.at(0) != '{'){
+						std::cerr << "Discord replied:\n" << ss.str() << "\nTo the following target:\n" << target
+						          << "\nWith the following payload:\n" << payload << std::endl;
+					}else{
+						jres = json::parse(body);
+					}
 				}
 			}
 
@@ -290,6 +293,19 @@ namespace discordpp{
 				}else if(message != ""){
 					std::cout << "Discord API sent a message: \"" << message << "\"" << std::endl;
 				}
+			}
+			if(jres.find("embed") != jres.end()){
+				std::cout << "Discord API didn't like the following parts of your embed: ";
+				bool first = true;
+				for(json part : jres["embed"]){
+					if(first){
+						first = false;
+					}else{
+						std::cout << ", ";
+					}
+					std::cout << part.get<std::string>();
+				}
+				std::cout << std::endl;
 			}
 
 			if(callback != nullptr){

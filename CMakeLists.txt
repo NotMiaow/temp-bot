@@ -16,6 +16,7 @@ INCLUDE_DIRECTORIES(
         ${discordpp-plugin-responder_SOURCE_DIR}
         ${json_SOURCE_DIR}
         ${OPENSSL_INCLUDE_DIR}
+        ${PROJECT_SOURCE_DIR}/lib
         ${PROJECT_SOURCE_DIR}/_lib/basic_lib
         ${PROJECT_SOURCE_DIR}/_lib/queue
         ${PROJECT_SOURCE_DIR}/_lib/component_array

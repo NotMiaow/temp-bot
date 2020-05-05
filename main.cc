@@ -6,16 +6,16 @@
 #include <mutex>
 #include <condition_variable>
 
-#include "shared_queue.h"
-#include "event.h"
-#include "miaBot.h"
-
 #include <boost/asio.hpp>
 #include <discordpp/bot.hh>
 #include <discordpp/plugin-overload.hh>
 #include <discordpp/rest-beast.hh>
 #include <discordpp/websocket-beast.hh>
 #include <discordpp/plugin-responder.hh>
+
+#include "shared_queue.h"
+#include "event.h"
+#include "miaBot.h"
 
 namespace asio = boost::asio;
 using json = nlohmann::json;
@@ -108,8 +108,52 @@ int main()
 	);
 	bot->handlers.insert(
 		{
+			"CHANNEL_DELETE",
+			[&bot, &self](json msg) {
+				mia->QueueCommand(
+					true,
+					"EmptyEvent",
+					"",
+					"",
+					""
+				);
+			}
+		}
+	);
+	bot->handlers.insert(
+		{
 			"CHANNEL_UPDATE",
 			[&bot, &self](json msg) {
+				mia->QueueCommand(
+					true,
+					"EmptyEvent",
+					"",
+					"",
+					""
+				);
+			}
+		}
+	);
+	bot->handlers.insert(
+		{
+			"GUILD_MEMBERS",
+			[&bot, &self](json msg) {
+				std::cout << "received guild members payload" << std::endl;
+				mia->QueueCommand(
+					true,
+					"EmptyEvent",
+					"",
+					"",
+					""
+				);
+			}
+		}
+	);
+	bot->handlers.insert(
+		{
+			"GUILD_MEMBER_UPDATE",
+			[&bot, &self](json msg) {
+				std::cout << "received guild member update payload" << std::endl;
 				mia->QueueCommand(
 					true,
 					"EmptyEvent",
@@ -175,6 +219,8 @@ void SendQueuedRequests(std::shared_ptr<DppBot> bot) {
 
 		if (eventQueue.size())
 		{
+			int waitFor = 0;
+
 			Event* event = eventQueue.front();
 			if(event != 0 && mia->HandleEvent(event) && !event->fromAPI && !event->ReadOnly())
 			{
@@ -191,21 +237,22 @@ void SendQueuedRequests(std::shared_ptr<DppBot> bot) {
 						bot->call(event->method, event->type, event->content);
 						break;
 				}
+				waitFor = 600;
 			}
 
-			if(!event->fromAPI && event->WaitForResponse())
+			if(!event->fromAPI && event->waitForResponse)
 			{
-				while(eventQueue.size() > 1)
+				while(eventQueue.size() <= 1)
 				{
 					std::cout << "Waiting for API ..." << std::endl;
 					std::this_thread::sleep_for(std::chrono::milliseconds(100));
 				}
+				std::cout << "gotAnswer" << std::endl;
 			}			
 
 			delete event;
 			eventQueue.pop_front();
-
-			std::this_thread::sleep_for(std::chrono::milliseconds(1150));
+			std::this_thread::sleep_for(std::chrono::milliseconds(waitFor));
 		}
 	}
 }
