@@ -24,7 +24,9 @@ enum EEventType
 	EDeleteCategory,
 	EMoveCategory,
 	EMoveUser,
-	ECreateMatch
+	ECreateMatch,
+	EChangeGroupPermissions,
+	ESetMatchVoicePermissions
 };
 
 enum EErrorType
@@ -49,7 +51,9 @@ static const std::map<std::string, EEventType> optionEventTypes {
 	{ "delete-category", EDeleteCategory },
 	{ "move-category", EMoveCategory },
 	{ "move-user", EMoveUser},
-	{ "create-match", ECreateMatch }
+	{ "create-match", ECreateMatch },
+	{ "change-group-permissions", EChangeGroupPermissions },
+	{ "set-match-voice-permissions", ESetMatchVoicePermissions }
 };
 
 #endif

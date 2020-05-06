@@ -11,14 +11,13 @@ struct PreparationComponent
     {
         for(int i = 0; i < userCount; i++)
         {
-            presences.push_back(false);
-            readyUps.push_back(false);
+            active.push_back(false);
+            readies.push_back(false);
         }
     }
 
-    std::vector<bool> presences;
-    std::vector<bool> readyUps;
-    std::vector<std::string> userIds;
+    std::vector<bool> active;
+    std::vector<bool> readies;
 };
 
 #endif

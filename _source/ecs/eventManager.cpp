@@ -45,6 +45,10 @@ bool EventManager::HandleEvent(Event* event)
         return MoveUser(event);
     case ECreateMatch:
         return CreateMatch(event);
+    case EChangeGroupPermissions:
+        return true;
+    case ESetMatchVoicePermissions:
+        return true;
     default:
         return false;
     }
@@ -105,22 +109,22 @@ bool EventManager::NewGroup(Event* event)
         return false;
     }
 
-    std::map<int, int> channelOrder;
-    for(GroupsIterator i = m_groups->GetIterator(groupCheckpoint); !i.End(); i++)
-    {
-        Groups::Entry* channel = i.GetEntry();
-        if(channel->data.parentId == newGroupEvent->group.parentId && channel->data.id != newChannel->data.id)
-        {
-            channelOrder.insert(
-                std::make_pair(
-                    channel->data.position >= newGroupEvent->group.position ? channel->data.position + 1 : channel->data.position,
-                    channel->entityId
-                )
-            );
-        }
-    }
-
-    SetGroupPositions(channelOrder, newGroupEvent->group.parentId, newGroupEvent->channelId, newGroupEvent->guildId);
+//    std::map<int, int> channelOrder;
+//    for(GroupsIterator i = m_groups->GetIterator(groupCheckpoint); !i.End(); i++)
+//    {
+//        Groups::Entry* channel = i.GetEntry();
+//        if(channel->data.parentId == newGroupEvent->group.parentId && channel->data.id != newChannel->data.id)
+//        {
+//            channelOrder.insert(
+//                std::make_pair(
+//                    channel->data.position >= newGroupEvent->group.position ? channel->data.position + 1 : channel->data.position,
+//                    channel->entityId
+//                )
+//            );
+//        }
+//    }
+//
+//    SetGroupPositions(channelOrder, newGroupEvent->group.parentId, newGroupEvent->channelId, newGroupEvent->guildId);
     return true;
 }
 
@@ -479,13 +483,18 @@ bool EventManager::CreateMatch(Event* event)
     //Handle CreateMatchEvent Step 0
     if(createMatchEvent->creationStep == 0)
     {
-        int lobbyPosition = 1;
+        std::map<int, int> matchOrder;
         for(Groups::Iterator i = m_groups->GetIterator(GROUP_MATCH_CATEGORIES); !i.End(); i++)
         {
             Groups::Entry* match = i.GetEntry();
-            if(lobbyPosition == match->data.position)
-                lobbyPosition = match->data.position + 1;
+            matchOrder.insert(std::make_pair(match->data.position, match->entityId));
         }
+        int lobbyPosition = 1;
+        for (std::map<int, int>::iterator i = matchOrder.begin(); i != matchOrder.end(); i++)
+            if(lobbyPosition == i->first)
+                lobbyPosition++;
+
+        //Set match name
         std::string matchName = "lobby-";
         matchName += std::to_string(lobbyPosition);
         createMatchEvent->matchName = matchName;
@@ -507,9 +516,7 @@ bool EventManager::CreateMatch(Event* event)
         for(std::vector<std::string>::iterator i = createMatchEvent->userIds.begin(); i < createMatchEvent->userIds.end(); i++)
             parameters.push_back(*i);
 
-        m_robotQueue->push_back(
-            CreateCreateMatchEvent(false, "create-match", parameters, createMatchEvent->channelId, createMatchEvent->guildId)
-        );
+        m_robotQueue->push_back(CreateCreateMatchEvent(false, "create-match", parameters, createMatchEvent->channelId, createMatchEvent->guildId));
 
         return true;
     }
@@ -558,17 +565,96 @@ bool EventManager::CreateMatch(Event* event)
         parameters.push_back(std::to_string(createMatchEvent->userCount));
         for(std::vector<std::string>::iterator i = createMatchEvent->userIds.begin(); i < createMatchEvent->userIds.end(); i++)
             parameters.push_back(*i);
-        CreateCreateMatchEvent(false, "create-match", parameters, createMatchEvent->channelId, createMatchEvent->guildId);
+        m_robotQueue->push_back(CreateCreateMatchEvent(false, "create-match", parameters, createMatchEvent->channelId, createMatchEvent->guildId));
 
         return true;
     }
     //Handle CreateMatchEvent Step 2
     else if(createMatchEvent->creationStep == 2)
     {
-        std::cout << "reached step 2" << std::endl;
+        // ECS new match entity
+        PreparationComponent preparation;
+        LobbyComponent lobby;
+
+        std::vector<std::string> parameters;
+        // Text channel permissions
+        for(Groups::Iterator i = m_groups->GetIterator(GROUP_TEXT_CHANNELS); !i.End(); i++)
+        {
+            Groups::Entry* channel = i.GetEntry();
+            if(channel->data.parentId == createMatchEvent->matchId)
+            {
+                // Give both team VIEW_CHANNEL, SEND_MESSAGES
+                parameters.clear();
+                parameters.push_back("1");
+                parameters.push_back(channel->data.id);
+                parameters.push_back(channel->data.name);
+                parameters.push_back(std::to_string(channel->data.type));
+                parameters.push_back("3072");
+                parameters.push_back(std::to_string(createMatchEvent->userIds.size()));
+                for(std::vector<std::string>::const_iterator j = createMatchEvent->userIds.begin(); j < createMatchEvent->userIds.end(); j++)
+                    parameters.push_back(*j);
+                m_robotQueue->push_back(
+                    CreateChangeGroupPermissionsEvent(false, "give-group-permissions", parameters, createMatchEvent->channelId, createMatchEvent->guildId)
+                );
+
+                //ECS add text channel as child of lobby
+                lobby.groupIds.push_back(channel->data.id);
+            }
+        }
+
+        // Voice channel permissions
+        for(Groups::Iterator i = m_groups->GetIterator(GROUP_VOICE_CHANNELS); !i.End(); i++)
+        {
+            Groups::Entry* channel = i.GetEntry();
+            if(channel->data.parentId == createMatchEvent->matchId)
+            {
+                // Give each team VIEW_CHANNEL, CONNECT, SPEAK, USE_VAD on their own voice channel
+                // Give each team VIEW_CHANNEL on their opponent's voice channel
+                parameters.clear();
+                parameters.push_back("1");
+                parameters.push_back(channel->data.id);
+                parameters.push_back(channel->data.name);
+                parameters.push_back("2");
+                parameters.push_back("36701184");
+                parameters.push_back("1024");
+                parameters.push_back(std::to_string(createMatchEvent->userIds.size()));
+                if(channel->data.name == "team-1")
+                {
+                    int userCount = 0;
+                    for(std::vector<std::string>::const_iterator j = createMatchEvent->userIds.begin(); j < createMatchEvent->userIds.end();j++)
+                    {
+                        parameters.push_back(*j);
+                        if(userCount < createMatchEvent->userIds.size() / 2)
+                            channel->data.userIds.push_back(*j);
+                    }
+                }
+                else
+                {
+                    int userCount = 0;
+                    for(std::vector<std::string>::const_reverse_iterator j = createMatchEvent->userIds.rbegin(); j < createMatchEvent->userIds.rend();j++)
+                    {
+                        parameters.push_back(*j);
+                        if(userCount < createMatchEvent->userIds.size() / 2)
+                            channel->data.userIds.push_back(*j);
+                    }
+                }
+                
+                m_robotQueue->push_back(
+                    CreateSetMatchVoicePermissionsEvent(false, "set-match-voice-permissions", parameters, createMatchEvent->channelId, createMatchEvent->guildId)
+                );
+
+                //ECS add voice channels as children of lobby
+                lobby.groupIds.push_back(channel->data.id);
+            }
+        }
+        
+        int entityId = m_entityCounter->GetId();
+        m_preparations->Add(preparation, entityId, PREPARATION_MATCHES);
+        m_lobbies->Add(lobby, entityId, LOBBY_MATCHES);
 
         return true;
     }
+    std::cout << "failed at step : " << createMatchEvent->creationStep << std::endl;
     return false;
 }
 
@@ -577,7 +663,6 @@ void EventManager::SetGroupPositions(std::map<int,int>& channelOrder, std::strin
     int next = 1;
     for (std::map<int, int>::reverse_iterator i = channelOrder.rbegin(); i != channelOrder.rend(); i++, next++)
     {
-
         Groups::Row group = m_groups->GetById(i->second);
         if(group.data->position != i->first)
         {

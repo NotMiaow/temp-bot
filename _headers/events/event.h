@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -11,6 +12,7 @@
 #include "preparationComponent.h"
 #include "lobbyComponent.h"
 #include "groupComponent.h"
+#include "roleComponent.h"
 
 #include "eventLanguage.h"
 
@@ -49,7 +51,7 @@ struct ErrorEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << EError << ';' << message << ';' << channelId << ';' << eOffender  << ';' << eType << ';' << geType << '}';
+		os << '{' << "Error" << ';' << message << ';' << eOffender  << ';' << eType << ';' << geType << '}';
 		return os.str();
 	}
 
@@ -72,7 +74,7 @@ struct EmptyEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << " " << '}';
+		os << '{' << "Empty" << '}';
 		return os.str();
 	}
 };
@@ -93,7 +95,7 @@ struct ShutdownEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << EShutdown << '}';
+		os << '{' << "shutdown" << '}';
 		return os.str();
 	}
 };
@@ -119,8 +121,10 @@ struct NewGroupEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << ENewGroup << ';' << channelId  << ';' << guildId << ';' << group.name << ';' << group.parentId << ';' <<
-		group.id << ';' << group.position  << '}';
+		os << '{' << "new-group" << ';' << group.name << ';';
+		if(group.type != 4)
+			os << group.parentId << ';';
+		os << group.id << ';' << group.position  << '}';
 		return os.str();
 	}
 	GroupComponent group;
@@ -151,7 +155,7 @@ struct UpdateGroupEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << EUpdateGroup << ';' << channelId  << ';' << guildId << ';' << group.id << ';' << group.type << ';' << group.position << '}';
+		os << '{' << "update-group" << ';' << group.id << ';' << group.type << ';' << group.position << '}';
 		return os.str();
 	}
 
@@ -187,8 +191,10 @@ struct CreateChannelEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << ECreateChannel << ';' << channelId  << ';' << guildId << ';' << channel.name << ';' << channel.type << ';' << 
-		channel.parentId <<  ';' << channel.position << std::string(channel.type == 0 ? "" : ";" + std::to_string(channel.userLimit)) << '}';
+		os << '{' << "create-channel" << ';' << channel.name << ';' << channel.type << ';' << channel.parentId <<  ';' << channel.position;
+		if(channel.type == 2)
+			os << ';' << channel.userLimit;
+		os << '}';
 		return os.str();
 	}
 
@@ -218,7 +224,7 @@ struct DeleteChannelEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << EDeleteChannel << ';' << channel.id << '}';
+		os << '{' << "delete-channel" << ';' << channel.id << '}';
 		return os.str();
 	}
 
@@ -248,7 +254,7 @@ struct MoveChannelEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << EMoveChannel << ';' << channelId  << ';' << guildId << ';' << channel.id << ';' << channel.position << '}';
+		os << '{' << "move-channel" << ';' << channel.id << ';' << channel.position << '}';
 		return os.str();
 	}
 
@@ -282,8 +288,7 @@ struct CreateCategoryEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << ECreateCategory << ';' << channelId  << ';' << guildId << ';' << category.name << ';' << category.type << ';' << 
-		category.position << '}';
+		os << '{' << "create-category" << ';' << category.name << ';' << category.position << '}';
 		return os.str();
 	}
 
@@ -314,7 +319,7 @@ struct DeleteCategoryEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << EDeleteCategory << ';' << category.id << '}';
+		os << '{' << "delete-category" << ';' << category.id << '}';
 		return os.str();
 	}
 
@@ -345,7 +350,7 @@ struct MoveCategoryEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << EMoveCategory << ';' << channelId  << ';' << guildId << ';' << category.id << ';' << category.position << '}';
+		os << '{' << "move-category" << ';' << category.id << ';' << category.position << '}';
 		return os.str();
 	}
 
@@ -377,7 +382,7 @@ struct MoveUserEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << EMoveUser << ';' << channelId  << ';' << guildId << ';' << voiceChannel.id << ';' << voiceChannel.userIds[0]  << '}';
+		os << '{' << "move-user" << ';' << voiceChannel.id << ';' << voiceChannel.userIds[0]  << '}';
 		return os.str();
 	}
 
@@ -413,13 +418,155 @@ struct CreateMatchEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << ECreateMatch << ';' << channelId  << ';' << guildId << ';' << creationStep << ';'<< matchId << ';'<< matchName << ';' << userCount << '}';
+		os << '{' << "create-match" << ';' << creationStep << ';'<< matchId << ';'<< matchName << ';' << userCount << '}';
 		return os.str();
 	}
 
 	int creationStep;
 	std::string matchId;
 	std::string matchName;
+	int userCount;
+	std::vector<std::string> userIds;
+};
+
+struct ChangeGroupPermissionsEvent : public Event
+{
+	ChangeGroupPermissionsEvent(bool fromAPI, std::string method, std::string type, std::string channelId, std::string guildId,
+		bool give, GroupComponent group, int permissions, int userCount, std::vector<std::string> userIds)
+	{
+		this->waitForResponse = true;
+		this->fromAPI = fromAPI;
+		this->method = method;
+		this->type = type;
+		
+		this->channelId = channelId;
+		this->guildId = guildId;
+
+		this->give = give;
+		this->group = group;
+		this->userCount = userCount;
+		this->userIds = userIds;
+		this->permissions = permissions;
+		CreateJson();
+	}
+	bool ReadOnly() const { return false; }
+	EEventType GetType() const { return EChangeGroupPermissions; }
+	void CreateJson()
+	{
+		nlohmann::json overwrites;
+
+		std::vector<std::string>::const_iterator userIt = userIds.begin();
+		for(int i = 0; i < userCount; userIt++, i++)
+		{
+			nlohmann::json overwrite = {
+				{ "id", userIds[i] },
+				{ "type", "member" },
+				{ "allow", permissions },
+				{ "deny", 0 }
+			};
+			overwrites.push_back(overwrite);
+		}
+
+		this->content = {
+			{ "name", group.name },
+			{ "type", group.type },
+			{ "permission_overwrites", overwrites }
+	    };
+	}
+	std::string ToDebuggable() const
+	{
+		std::ostringstream os;
+		os << '{' << "change-group-permissions" << ';' << give << ';' << group.id << ';' << group.name << ';' << group.type << ';'
+		<< permissions << ';' << userIds.size() << ';';
+		std::vector<std::string>::const_iterator userIt = userIds.begin();
+		for(int i = 0; i < userCount; userIt++, i++)
+			os << *userIt  << (i + 1 < userCount ? ";" : "");
+		os << '}';
+		return os.str();
+	}
+
+	bool give;
+	GroupComponent group;
+	int permissions;
+	int userCount;
+	std::vector<std::string> userIds;
+};
+
+struct SetMatchVoicePermissionsEvent : public Event
+{
+	SetMatchVoicePermissionsEvent(bool fromAPI, std::string method, std::string type, std::string channelId, std::string guildId,
+		bool give, GroupComponent group, int permissions1, int permissions2, int userCount, std::vector<std::string> userIds)
+	{
+		this->waitForResponse = true;
+		this->fromAPI = fromAPI;
+		this->method = method;
+		this->type = type;
+		
+		this->channelId = channelId;
+		this->guildId = guildId;
+
+		this->give = give;
+		this->group = group;
+		this->userCount = userCount;
+		this->userIds = userIds;
+		this->permissions1 = permissions1;
+		this->permissions2 = permissions2;
+		CreateJson();
+	}
+	bool ReadOnly() const { return false; }
+	EEventType GetType() const { return ESetMatchVoicePermissions; }
+	void CreateJson()
+	{
+		nlohmann::json overwrites;
+
+		std::vector<std::string>::const_iterator userIt = userIds.begin();
+		for(int i = 0; i < userCount; userIt++, i++)
+		{
+			nlohmann::json overwrite;
+			if(i < userCount / 2)
+			{
+				overwrite = {
+					{ "id", userIds[i] },
+					{ "type", "member" },
+					{ "allow", permissions1 },
+					{ "deny", 0 }
+				};
+			}
+			else
+			{
+				overwrite = {
+					{ "id", userIds[i] },
+					{ "type", "member" },
+					{ "allow", permissions2 },
+					{ "deny", 0 }
+				};
+			}
+			overwrites.push_back(overwrite);
+		}
+
+		this->content = {
+			{ "name", group.name },
+			{ "type", group.type },
+			{ "permission_overwrites", overwrites }
+	    };
+		std::cout << std::endl << std::endl << this->content << std::endl << std::endl;
+	}
+	std::string ToDebuggable() const
+	{
+		std::ostringstream os;
+		os << '{' << "set-match-voice-permissions" << ';' << give << ';' << group.id << ';' << group.name << ';' << group.type << ';'
+		<< permissions1 << ';' << permissions2 << ';' << userIds.size() << ';';
+		std::vector<std::string>::const_iterator userIt = userIds.begin();
+		for(int i = 0; i < userCount; userIt++, i++)
+			os << *userIt  << (i + 1 < userCount ? ";" : "");
+		os << '}';
+		return os.str();
+	}
+
+	bool give;
+	GroupComponent group;
+	int permissions1;
+	int permissions2;
 	int userCount;
 	std::vector<std::string> userIds;
 };

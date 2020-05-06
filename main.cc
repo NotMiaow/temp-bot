@@ -237,17 +237,17 @@ void SendQueuedRequests(std::shared_ptr<DppBot> bot) {
 						bot->call(event->method, event->type, event->content);
 						break;
 				}
-				waitFor = 600;
+				waitFor = 550;
 			}
 
 			if(!event->fromAPI && event->waitForResponse)
 			{
-				while(eventQueue.size() <= 1)
+				int waitCounter = 0;
+				while(eventQueue.size() <= 1 && waitCounter++ < 3)
 				{
 					std::cout << "Waiting for API ..." << std::endl;
-					std::this_thread::sleep_for(std::chrono::milliseconds(100));
+					std::this_thread::sleep_for(std::chrono::milliseconds(500));
 				}
-				std::cout << "gotAnswer" << std::endl;
 			}			
 
 			delete event;

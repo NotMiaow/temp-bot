@@ -4,12 +4,14 @@
 #include "lobbyComponent.h"
 #include "preparationComponent.h"
 #include "groupComponent.h"
+#include "roleComponent.h"
 
 #include "componentArray.h"
 
 typedef ComponentArray<LobbyComponent, 20, 1> Lobbies;
 typedef ComponentArray<PreparationComponent, 20, 1> Preparations;
 typedef ComponentArray<GroupComponent, 80, 3> Groups;
+//typedef ComponentArray<RoleComponent, 60, 1> Groups;
 
 typedef Lobbies::Iterator LobbiesIterator;
 typedef Preparations::Iterator PreparationsIterator;
