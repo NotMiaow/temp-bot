@@ -6,6 +6,7 @@
 struct RoleComponent
 {
     RoleComponent() { }
+    ~RoleComponent() { }
 
     std::string id;
     std::string name;

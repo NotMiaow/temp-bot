@@ -7,6 +7,7 @@
 struct LobbyComponent
 {
     LobbyComponent() { }
+    ~LobbyComponent() { }
 
     std::vector<std::string> groupIds;
 };

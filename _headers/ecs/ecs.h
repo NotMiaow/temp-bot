@@ -13,8 +13,16 @@
 #include "entityCounter.h"
 #include "componentArray.h"
 //Components
+#include "lobbyComponent.h"
+#include "preparationComponent.h"
+#include "groupComponent.h"
+#include "queueComponent.h"
 
-//Systems
+
+// Systems
+#include "matchmakingSystem.h"
+
+// Misc
 #include "definitions.h"
 
 class ECS
@@ -22,7 +30,7 @@ class ECS
 public:
 	ECS() {}
 	~ECS();
-	void Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Lobbies& lobbies, Preparations& preparations, Groups& groups);
+	void Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Lobbies& lobbies, Preparations& preparations, Groups& groups, Queues& queues);
 	void Loop(const float& deltaTime);
 private:
 	void WaitForTerminate();
@@ -31,12 +39,14 @@ private:
 	Lobbies* m_lobbies;
 	Preparations* m_preparations;
 	Groups* m_groups;
+	Queues* m_queues;
 	
 	//Shared resources
 	EntityCounter* m_entityCounter;
 	SharedQueue<Event*>* m_robotQueue;
 
 	//Systems
+	MatchmakingSystem m_matchmakingSystem;
 };
 
 

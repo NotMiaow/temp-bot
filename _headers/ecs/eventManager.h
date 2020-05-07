@@ -17,7 +17,10 @@
 #include "componentArray.h"
 
 // Components
+#include "lobbyComponent.h"
 #include "groupComponent.h"
+#include "preparationComponent.h"
+#include "queueComponent.h"
 
 // Misc
 #include "definitions.h"
@@ -27,7 +30,7 @@ class EventManager
 public:
     EventManager() { }
     ~EventManager();
-    void Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Lobbies& lobbies, Preparations& preparations, Groups& groups);
+    void Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Lobbies& lobbies, Preparations& preparations, Groups& groups, Queues& queues);
     bool HandleEvent(Event* event);
     bool NewGroup(Event* event);
     bool UpdateGroup(Event* event);
@@ -46,7 +49,8 @@ private:
     Lobbies* m_lobbies;
     Preparations* m_preparations;
     Groups* m_groups;
-
+    Queues* m_queues;
+    
     EntityCounter* m_entityCounter;
     SharedQueue<Event*>* m_robotQueue;
 };

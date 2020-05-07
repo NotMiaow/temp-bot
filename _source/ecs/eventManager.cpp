@@ -5,11 +5,12 @@ EventManager::~EventManager()
 
 }
 
-void EventManager::Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Lobbies& lobbies, Preparations& preparations, Groups& groups)
+void EventManager::Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Lobbies& lobbies, Preparations& preparations, Groups& groups, Queues& queues)
 {
     m_lobbies = &lobbies;
     m_preparations = &preparations;
     m_groups = &groups;
+    m_queues = &queues;
 
     m_entityCounter = &entityCounter;
     m_robotQueue = &robotQueue;

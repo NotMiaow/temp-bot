@@ -15,6 +15,7 @@ struct PreparationComponent
             readies.push_back(false);
         }
     }
+    ~PreparationComponent() { }
 
     std::vector<bool> active;
     std::vector<bool> readies;

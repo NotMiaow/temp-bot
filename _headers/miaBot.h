@@ -15,6 +15,7 @@
 #include "lobbyComponent.h"
 #include "preparationComponent.h"
 #include "groupComponent.h"
+#include "queueComponent.h"
 
 // ECS
 #include "ecs.h"
@@ -39,6 +40,7 @@ private:
     Lobbies m_lobbies;
     Preparations m_preparations;
     Groups m_groups;
+    Queues m_queues;
 
 	// Misc
 	EntityCounter m_entityCounter;
