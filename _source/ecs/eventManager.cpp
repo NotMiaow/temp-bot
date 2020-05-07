@@ -572,7 +572,8 @@ bool EventManager::CreateMatch(Event* event)
     //Handle CreateMatchEvent Step 2
     else if(createMatchEvent->creationStep == 2)
     {
-        // ECS new match entity
+        // ECS components to add to match entity
+        int entityId;
         PreparationComponent preparation;
         LobbyComponent lobby;
 
@@ -583,6 +584,7 @@ bool EventManager::CreateMatch(Event* event)
             Groups::Entry* channel = i.GetEntry();
             if(channel->data.parentId == createMatchEvent->matchId)
             {
+                entityId = channel->entityId;
                 // Give both team VIEW_CHANNEL, SEND_MESSAGES
                 parameters.clear();
                 parameters.push_back("1");
@@ -648,7 +650,6 @@ bool EventManager::CreateMatch(Event* event)
             }
         }
         
-        int entityId = m_entityCounter->GetId();
         m_preparations->Add(preparation, entityId, PREPARATION_MATCHES);
         m_lobbies->Add(lobby, entityId, LOBBY_MATCHES);
 
