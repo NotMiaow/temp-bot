@@ -25,6 +25,12 @@ static Event* CreateErrorEvent(std::string message, std::string channelId, EOffe
 	return e;
 }
 
+static Event* CreateSendMessageEvent(std::string channelId, std::string message)
+{
+	Event* e = new SendMessageEvent(channelId, message);
+	return e;
+}
+
 static Event* CreateEmptyEvent()
 {
 	Event* e = new EmptyEvent();
@@ -106,7 +112,6 @@ static Event* CreateCreateChannelEvent(bool fromAPI, std::string command, std::v
 	{
 		if(!isalnum(channel.name[i]) && channel.name[i] != '-')
 		{
-			std::cout << "FORBIDDEN_CHARACTER: " << channel.name[i] << std::endl;
 			return CreateErrorEvent(
 				"Parameter 1 (name) of " + command + " must be composed of only alphanumeric caracters and '-'." + seeSignature,
 				channelId, EUser, ECreateChannel, EWrongParameterType
@@ -301,6 +306,7 @@ static Event* CreateCreateMatchEvent(bool fromAPI, std::string command, std::vec
 		);
 
 	int creationStep;
+	int entityId;
 	std::string gameId = parameters[1];
 	std::string gameName = parameters[2];
 	int userCount;
@@ -309,19 +315,22 @@ static Event* CreateCreateMatchEvent(bool fromAPI, std::string command, std::vec
 	if(!ToInt(parameters[0], creationStep))
 		return CreateErrorEvent("Parameter 1 (creation_step) of " + command + " must be an integral number.", channelId, EUser, ECreateMatch, EWrongParameterType);
 	
-	if(!ToInt(parameters[3], userCount))
+	if(!ToInt(parameters[1], entityId))
+		return CreateErrorEvent("Parameter 2 (entityId) of " + command + " must be an integral number.", channelId, EUser, ECreateMatch, EWrongParameterType);
+
+	if(!ToInt(parameters[4], userCount))
 		return CreateErrorEvent("Parameter 4 (user_count) of " + command + " must be an integral number.", channelId, EUser, ECreateMatch, EWrongParameterType);
 
-	if(parameters.size() != 4 + userCount)
+	if(parameters.size() != 5 + userCount)
 		return CreateErrorEvent(
 			"Wrong parameter amount." + seeSignature,
 			channelId, EUser, ECreateMatch, EWrongParemeterAmount
 		);
 	
-	for(int i = 4; i < 4 + userCount; i++)
+	for(int i = 5; i < 5 + userCount; i++)
 		userIds.push_back(parameters[i]);
 
-	Event* e = new CreateMatchEvent(channelId, guildId, creationStep, gameId, gameName, userCount, userIds);
+	Event* e = new CreateMatchEvent(channelId, guildId, creationStep, entityId, gameId, gameName, userCount, userIds);
 	return e;
 }
 
@@ -409,7 +418,39 @@ static Event* CreateSetMatchVoicePermissionsEvent(bool fromAPI, std::string comm
 	return e;
 }
 
-static Event* CreateEvent(bool fromAPI, std::string command, std::string content, std::string channelId, std::string guildId)
+static Event* CreateMessageMatchEvent(bool fromAPI, std::string command, std::vector<std::string> parameters, std::string channelId, std::string guildId)
+{
+	std::string seeSignature = "\nSee signature : \"" + command + " (entityId) (message)\"";
+
+	if(parameters.size() != 2)
+		return CreateErrorEvent(
+			"Wrong parameter amount." + seeSignature,
+			channelId, EUser, EMessageMatch, EWrongParemeterAmount
+		);
+	
+	int entityId;
+	if(!ToInt(parameters[6], entityId))
+		return CreateErrorEvent("Parameter 7 (user_count) of " + command + " must be an integral number.", channelId, EUser, EMessageMatch, EWrongParameterType);
+
+	Event* e = new MessageMatchEvent(entityId, parameters[1]);
+	return e;
+}
+
+static Event* CreateJoinQueueEvent(bool fromAPI, std::string command, std::vector<std::string> parameters, std::string userId, std::string channelId, std::string guildId)
+{
+	std::string seeSignature = "\nSee signature : \"" + command + " (queueName)\"";
+
+	if(parameters.size() != 1)
+		return CreateErrorEvent(
+			"Wrong parameter amount." + seeSignature,
+			channelId, EUser, EJoinQueue, EWrongParemeterAmount
+		);
+
+	Event* e = new JoinQueueEvent(channelId, guildId, parameters[0], userId);
+	return e;
+}
+
+static Event* CreateEvent(bool fromAPI, std::string command, std::string content, std::string userId, std::string channelId, std::string guildId)
 {
 	std::vector<std::string> parameters = Split(content, ' ');
 
@@ -446,6 +487,8 @@ static Event* CreateEvent(bool fromAPI, std::string command, std::string content
 			return CreateChangeGroupPermissionsEvent(fromAPI, command, parameters, channelId, guildId);
 		case ESetMatchVoicePermissions:
 			return CreateSetMatchVoicePermissionsEvent(fromAPI, command, parameters, channelId, guildId);
+		case EJoinQueue:
+			return CreateJoinQueueEvent(fromAPI, command, parameters, userId, channelId, guildId);
 		default:
 			return CreateErrorEvent("This command does not exist.", channelId, EUser, ECreateEvent, EWrongEventType);
 		}

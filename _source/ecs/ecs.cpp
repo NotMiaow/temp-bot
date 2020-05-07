@@ -17,7 +17,7 @@ void ECS::Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Lo
     m_entityCounter = &entityCounter;
 
     //Systems
-    m_matchmakingSystem = MatchmakingSystem(*m_robotQueue, *m_queues);
+    m_matchmakingSystem = MatchmakingSystem(*m_robotQueue, *m_entityCounter, *m_queues);
 }
 
 void ECS::Loop(const float& deltaTime)

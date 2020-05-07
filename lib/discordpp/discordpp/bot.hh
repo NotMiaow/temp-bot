@@ -37,7 +37,7 @@ namespace discordpp{
 		void sendHeartbeat(){
 			if(!gotACK){
 				std::cerr << "Discord Servers did not respond to heartbeat. Reconnect not implemented.\n";
-				exit(1);
+//				exit(1);
 			}
 			gotACK = false;
 			std::cout << "Sending heartbeat..." << std::endl;

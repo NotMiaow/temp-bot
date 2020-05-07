@@ -100,6 +100,29 @@ struct ShutdownEvent : public Event
 	}
 };
 
+struct SendMessageEvent : public Event
+{
+	SendMessageEvent(std::string message, std::string channelId)
+	{
+		this->waitForResponse = false;
+		fromAPI = false;
+
+		this->message = message;
+		this->channelId = channelId;
+	}
+	bool ReadOnly() const { return false; }
+	EEventType GetType() const { return ESendMessage; }
+	void CreateJson() { }
+	std::string ToDebuggable() const
+	{
+		std::ostringstream os;
+		os << '{' << "send-message" << ';' << channelId << ';' << message << '}';
+		return os.str();
+	}
+
+	std::string message;
+};
+
 struct NewGroupEvent : public Event
 {
 	NewGroupEvent(bool fromAPI, std::string channelId, std::string guildId, GroupComponent group)
@@ -392,7 +415,7 @@ struct MoveUserEvent : public Event
 struct CreateMatchEvent : public Event
 {
 	CreateMatchEvent(std::string channelId, std::string guildId,
-		int creationStep, std::string matchId, std::string matchName, int userCount, std::vector<std::string> userIds)
+		int creationStep, int entityId, std::string matchId, std::string matchName, int userCount, std::vector<std::string> userIds)
 	{
 		this->waitForResponse = false;
 		this->fromAPI = false;
@@ -402,6 +425,7 @@ struct CreateMatchEvent : public Event
 		this->channelId = channelId;
 		this->guildId = guildId;
 		this->creationStep = creationStep;
+		this->entityId = entityId;
 		this->matchId = matchId;
 		this->matchName = matchName;
 		this->userCount = userCount;
@@ -418,11 +442,16 @@ struct CreateMatchEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << "create-match" << ';' << creationStep << ';'<< matchId << ';'<< matchName << ';' << userCount << '}';
+		os << '{' << "create-match" << ';' << creationStep << ';' << entityId << ';'<< matchId << ';'<< matchName << ';' << userCount << ';';
+		std::vector<std::string>::const_iterator userIt = userIds.begin();
+		for(int i = 0; i < userCount; userIt++, i++)
+			os << *userIt  << (i + 1 < userCount ? ";" : "");
+		os << '}';
 		return os.str();
 	}
 
 	int creationStep;
+	int entityId;
 	std::string matchId;
 	std::string matchName;
 	int userCount;
@@ -570,5 +599,60 @@ struct SetMatchVoicePermissionsEvent : public Event
 	int userCount;
 	std::vector<std::string> userIds;
 };
+
+struct MessageMatchEvent : public Event
+{
+	MessageMatchEvent(int entityId, std::string message)
+	{
+		this->waitForResponse = false;
+		fromAPI = false;
+
+		this->message = message;
+		this->entityId = entityId;
+	}
+	bool ReadOnly() const { return false; }
+	EEventType GetType() const { return ESendMessage; }
+	void CreateJson() { }
+	std::string ToDebuggable() const
+	{
+		std::ostringstream os;
+		os << '{' << "send-message" << ';' << entityId << ';' << message << '}';
+		return os.str();
+	}
+
+	int entityId;
+	std::string message;
+};
+
+
+struct JoinQueueEvent : public Event
+{
+	JoinQueueEvent(std::string channelId, std::string guildId, std::string queueName, std::string userId)
+	{
+		this->waitForResponse = false;
+		this->fromAPI = false;
+		this->method = "";
+		this->type = "";
+
+		this->channelId = channelId;
+		this->guildId = guildId;
+		this->queueName = queueName;
+		this->userId = userId;
+		CreateJson();
+	}
+	bool ReadOnly() const { return true; }
+	EEventType GetType() const { return EJoinQueue; }
+	void CreateJson() { }
+	std::string ToDebuggable() const
+	{
+		std::ostringstream os;
+		os << '{' << "join-queue" << ';' << channelId << ';' << queueName << ';' << userId  << '}';
+		return os.str();
+	}
+
+	std::string queueName;
+	std::string userId;
+};
+
 
 #endif
