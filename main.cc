@@ -202,14 +202,6 @@ int main()
 	return 0;
 }
 
-void Loop() 
-{
-	while(alive)
-	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(50));
-	}
-}
-
 void Loop(std::shared_ptr<DppBot> bot) {
 	bool delayNextAPIRequest = false;
 	float waitForBotTimer = 0.0f;
