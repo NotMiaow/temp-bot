@@ -28,10 +28,12 @@ void filter(std::string &target, const std::string &pattern);
 auto aioc = std::make_shared<asio::io_context>();
 
 // Mia related
-void Loop();
-void SendQueuedRequests(std::shared_ptr<DppBot> bot);
+void Loop(std::shared_ptr<DppBot> bot);
+double currentTime;
+float deltaTime;
+std::chrono::time_point<std::chrono::high_resolution_clock> curTime;
+std::chrono::time_point<std::chrono::high_resolution_clock> prevTime;
 std::thread miaLoop;
-std::thread miaRequests;
 MiaBot* mia = nullptr;
 SharedQueue<Event*> eventQueue;
 SharedQueue<Event*> robotQueue;
@@ -44,10 +46,9 @@ void Stop();
 void WaitForTerminate();
 std::thread terminateThread;
 std::atomic<bool> alive;
+std::atomic<bool> waitForBot;
 std::promise<void> exitSignal;
 std::shared_future<void> futureObj;
-
-void SendError();
 
 int main()
 {
@@ -165,27 +166,39 @@ int main()
 		}
 	);
 
-	bot->initBot(6, token, aioc);
-
-	// Allow clean termination
+	// Launch MiaBot
+	curTime = std::chrono::high_resolution_clock::now();
+	mia = new MiaBot(eventQueue, robotQueue, humanQueue);
+	// Prepare threads
 	alive = true;
 	futureObj = exitSignal.get_future();
+	// Fire threads
 	terminateThread = std::thread(&WaitForTerminate);
+	miaLoop = std::thread(&Loop, bot);
 
-	// Launch MiaBot
-	mia = new MiaBot(eventQueue, robotQueue, humanQueue);
-	miaLoop = std::thread(&Loop);
-	miaRequests = std::thread(&SendQueuedRequests, bot);
-
-	// Run bot
-	bot->run();
+	while(alive)
+	{
+		try
+		{
+			bot->initBot(6, token, aioc);
+			bot->run();
+			waitForBot = true;
+		}
+		catch(const std::exception& e)
+		{
+			std::cerr << e.what() << '\n';
+			waitForBot = true;
+			std::ofstream errorLogFile;
+			errorLogFile.open ("example.txt", std::ios::app);
+			errorLogFile << "\n" << e.what() << "\n";
+			errorLogFile.close();
+		}
+	}
 
 	// Wait for clean termination
 	miaLoop.join();
-	miaRequests.join();
 	terminateThread.join();
 	delete mia;
-
 	return 0;
 }
 
@@ -193,66 +206,114 @@ void Loop()
 {
 	while(alive)
 	{
-		mia->Loop();
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));
 	}
 }
 
-void SendQueuedRequests(std::shared_ptr<DppBot> bot) {
-	while(alive)
+void Loop(std::shared_ptr<DppBot> bot) {
+	bool delayNextAPIRequest = false;
+	float waitForBotTimer = 0.0f;
+	float delayTimer = 0.0f;
+	float waitTimer = 0.0f;
+	float waitForResponse = 0.0f;
+
+	while(alive || waitForResponse > 0.0f)
 	{
-		if(!eventQueue.size())
+		prevTime = curTime;
+		curTime = std::chrono::high_resolution_clock::now();
+		deltaTime = (float)((std::chrono::duration<double>)(curTime - prevTime)).count();
+		currentTime += deltaTime;
+
+		// If bot crashed or stopped for whatever reason,
+		// Give it time to restart and then resume.
+		if(waitForBot)
 		{
-			if(robotQueue.size())
+			waitForBotTimer += deltaTime;
+			if(waitForBotTimer > 2.0f)
 			{
-				eventQueue.push_back(robotQueue.front());
-				robotQueue.pop_front();
+				waitForBotTimer = 0.0f;
+				waitForBot = false;
 			}
-			else if(humanQueue.size())
-			{
-				eventQueue.push_back(humanQueue.front());
-				humanQueue.pop_front();
-			}
-			else
-				std::this_thread::sleep_for(std::chrono::milliseconds(50));
 		}
-
-		if (eventQueue.size())
+		else
 		{
-			int waitFor = 0;
+			// ECS loop
+			mia->Loop();
 
-			Event* event = eventQueue.front();
-			if(event != 0 && mia->HandleEvent(event) && !event->fromAPI && !event->ReadOnly())
+			// *****Discord API has a limit of 2 requests per second*****
+			// Delay request in order not to spam the API
+			// Set to 550 milliseconds to be safe
+			if(delayNextAPIRequest)
 			{
-				std::cout << "send : " << event->ToDebuggable() << std::endl;
-				switch(event->GetType())
+				delayTimer += deltaTime;
+				if(delayTimer > 0.550f)
 				{
-					case EShutdown:
-						Stop();
-						break;
-					case EError:
-						bot->call("POST", "/channels/" + event->channelId + "/messages", json({{"content", ((ErrorEvent*)event)->message }}));
-						break;
-					default :
-						bot->call(event->method, event->type, event->content);
-						break;
+					delayTimer = 0.0f;
+					delayNextAPIRequest = false;
 				}
-				waitFor = 550;
 			}
-
-			if(!event->fromAPI && event->waitForResponse)
+			// Wait for API response to a previous request
+			else if(eventQueue.size() < 1 && waitForResponse > 0.0f)
 			{
-				int waitCounter = 0;
-				while(eventQueue.size() <= 1 && waitCounter++ < 3)
+				waitForResponse += -deltaTime;
+				waitTimer += deltaTime;
+				if(waitTimer > 0.5f)
 				{
+					waitTimer = 0.0f;
 					std::cout << "Waiting for API ..." << std::endl;
-					std::this_thread::sleep_for(std::chrono::milliseconds(500));
 				}
-			}			
+				if(waitForResponse <= 0.0f)
+					std::cout << "Did not catch API response, if any." << std::endl;
+			}
+			// Handle new event
+			else
+			{
+				waitForResponse = 0;
+				if(!eventQueue.size())
+				{
+					if(robotQueue.size())
+					{
+						eventQueue.push_back(robotQueue.front());
+						robotQueue.pop_front();
+					}
+					else if(humanQueue.size())
+					{
+						eventQueue.push_back(humanQueue.front());
+						humanQueue.pop_front();
+					}
+					else
+						std::this_thread::sleep_for(std::chrono::milliseconds(50));
+				}
 
-			delete event;
-			eventQueue.pop_front();
-			std::this_thread::sleep_for(std::chrono::milliseconds(waitFor));
+				if (eventQueue.size())
+				{
+					Event* event = eventQueue.front();
+					if(event != 0 && mia->HandleEvent(event) && !event->fromAPI && !event->ReadOnly())
+					{
+						std::cout << "send : " << event->ToDebuggable() << std::endl;
+						delayNextAPIRequest = true;
+						switch(event->GetType())
+						{
+							case EShutdown:
+								Stop();
+								break;
+							case EError:
+								bot->call("POST", "/channels/" + event->channelId + "/messages", json({{"content", ((ErrorEvent*)event)->message }}));
+								break;
+							default :
+								bot->call(event->method, event->type, event->content);
+								break;
+						}
+					}
+
+					if(event->waitForResponse)
+						waitForResponse = 2.0f;
+
+					delete event;
+					eventQueue.pop_front();
+				}
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(15));
 		}
 	}
 }

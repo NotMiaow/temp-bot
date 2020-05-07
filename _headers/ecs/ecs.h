@@ -15,8 +15,6 @@
 //Components
 
 //Systems
-#include "timeSystem.h"
-
 #include "definitions.h"
 
 class ECS
@@ -39,7 +37,6 @@ private:
 	SharedQueue<Event*>* m_robotQueue;
 
 	//Systems
-	TimeSystem m_timeSystem;
 };
 
 

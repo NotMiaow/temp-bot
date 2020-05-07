@@ -79,10 +79,10 @@ namespace discordpp{
 					break;
 				case 7:  // Reconnect:          used to tell clients to reconnect to the gateway
 					std::cerr << "Discord Servers requested a reconnect. Reconnect not implemented.";
-					exit(1);
+//					exit(1);
 				case 9:  // Invalid Session:	used to notify client they have an invalid session id
 					std::cerr << "Discord Servers notified of an invalid session ID. Reconnect not implemented.";
-					exit(1);
+//					exit(1);
 				case 10: // Hello:              sent immediately after connecting, contains heartbeat and server debug information
 					heartrate_ = std::make_unique<std::chrono::milliseconds>(payload["d"]["heartbeat_interval"]);
 					sendHeartbeat();

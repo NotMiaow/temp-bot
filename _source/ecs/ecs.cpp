@@ -16,11 +16,10 @@ void ECS::Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Lo
     m_entityCounter = &entityCounter;
 
     //Systems
-    m_timeSystem = TimeSystem();
 }
 
 void ECS::Loop()
 {
-    m_timeSystem.Loop();
+
 }
 
