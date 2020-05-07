@@ -42,8 +42,6 @@ public:
     bool MoveCategory(Event* event);
     bool MoveUser(Event* event);
     bool CreateMatch(Event* event);
-    bool MessageMatch(Event* event);
-    bool JoinQueue(Event* event);
     void SetGroupPositions(std::map<int,int>& channelOrder, std::string parentId, std::string channelId, std::string guildId);
     bool GetGroupById(Groups::Entry*& group, std::string id);
 private:

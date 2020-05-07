@@ -28,7 +28,7 @@ public:
     MiaBot(SharedQueue<Event*>& eventQueue, SharedQueue<Event*>& robotQueue, SharedQueue<Event*>& humanQueue);
     ~MiaBot();
     void Loop(const float& deltaTime);
-    void QueueCommand(bool fromAPI, std::string command, std::string content, std::string userId, std::string channelId, std::string guildId);
+    void QueueCommand(bool fromAPI, std::string command, std::string content, std::string channelId, std::string guildId);
     bool HandleEvent(Event* event);
 private:
     // Shared resources

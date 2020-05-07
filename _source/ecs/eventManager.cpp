@@ -26,8 +26,6 @@ bool EventManager::HandleEvent(Event* event)
         return true;
     case EShutdown:
         return true;
-    case ESendMessage:
-        return true;
     case ENewGroup:
         return NewGroup(event);
     case EUpdateGroup:
@@ -48,14 +46,10 @@ bool EventManager::HandleEvent(Event* event)
         return MoveUser(event);
     case ECreateMatch:
         return CreateMatch(event);
-    case EMessageMatch:
-        return MessageMatch(event);
     case EChangeGroupPermissions:
         return true;
     case ESetMatchVoicePermissions:
         return true;
-    case EJoinQueue:
-        return JoinQueue(event);
     default:
         return false;
     }
@@ -329,8 +323,8 @@ bool EventManager::CreateCategory(Event* event)
         }
     }
 
-//    if(createCategoryEvent->category.position > childrenCount)
-//        createCategoryEvent->category.position = childrenCount + 1;
+    if(createCategoryEvent->category.position > childrenCount)
+        createCategoryEvent->category.position = childrenCount + 1;
     createCategoryEvent->CreateJson();
 
     m_groups->Add(
@@ -496,14 +490,14 @@ bool EventManager::CreateMatch(Event* event)
             Groups::Entry* match = i.GetEntry();
             matchOrder.insert(std::make_pair(match->data.position, match->entityId));
         }
-        int lobbyPosition = 1 + 2;
+        int lobbyPosition = 1;
         for (std::map<int, int>::iterator i = matchOrder.begin(); i != matchOrder.end(); i++)
             if(lobbyPosition == i->first)
                 lobbyPosition++;
 
         //Set match name
         std::string matchName = "lobby-";
-        matchName += std::to_string(lobbyPosition - 2);
+        matchName += std::to_string(lobbyPosition);
         createMatchEvent->matchName = matchName;
 
         //Create Match Holder
@@ -580,6 +574,7 @@ bool EventManager::CreateMatch(Event* event)
     else if(createMatchEvent->creationStep == 2)
     {
         // ECS components to add to match entity
+        int entityId;
         PreparationComponent preparation;
         LobbyComponent lobby;
 
@@ -590,6 +585,7 @@ bool EventManager::CreateMatch(Event* event)
             Groups::Entry* channel = i.GetEntry();
             if(channel->data.parentId == createMatchEvent->matchId)
             {
+                entityId = channel->entityId;
                 // Give both team VIEW_CHANNEL, SEND_MESSAGES
                 parameters.clear();
                 parameters.push_back("1");
@@ -655,76 +651,12 @@ bool EventManager::CreateMatch(Event* event)
             }
         }
         
-        m_preparations->Add(preparation, createMatchEvent->entityId, PREPARATION_MATCHES);
-        m_lobbies->Add(lobby, createMatchEvent->entityId, LOBBY_MATCHES);
+        m_preparations->Add(preparation, entityId, PREPARATION_MATCHES);
+        m_lobbies->Add(lobby, entityId, LOBBY_MATCHES);
 
         return true;
     }
     std::cout << "failed at step : " << createMatchEvent->creationStep << std::endl;
-    return false;
-}
-
-bool EventManager::MessageMatch(Event* event)
-{
-    MessageMatchEvent* messageMatchEvent = dynamic_cast<MessageMatchEvent*>(event);
-
-    for(LobbiesIterator i = m_lobbies->GetIterator(LOBBY_MATCHES); !i.End(); i++)
-    {
-        Lobbies::Entry* lobby = i.GetEntry();
-        if(lobby->entityId == messageMatchEvent->entityId)
-        m_robotQueue->push_back(
-            CreateSendMessageEvent(lobby->data.groupIds[0], messageMatchEvent->message)
-        );
-        return true;
-    }
-
-    std::cout << "oups" << std::endl;
-
-    return false;
-}
-
-bool EventManager::JoinQueue(Event* event)
-{
-    JoinQueueEvent* joinQueueEvent = dynamic_cast<JoinQueueEvent*>(event);
-
-	auto queueType = leagueQueueTypes.find(joinQueueEvent->queueName);
-	if(queueType != leagueQueueTypes.end())
-    {
-        for(QueueIterator i = m_queues->GetIterator(); !i.End(); i++)
-        {
-            QueueComponent* queue = i.GetData();
-            if(queue->type == (int)queueType->second)
-                queue->spot.push(std::make_pair(joinQueueEvent->userId, joinQueueEvent->channelId));
-        }
-
-        m_robotQueue->push_back(
-            CreateSendMessageEvent(
-                "You have successfully queued to \"" + joinQueueEvent->queueName + "\".\n" +
-                "You will be sent an invite link to your team's channel when your queue pops!" +
-                " ***(Not implemented yet)***",
-                joinQueueEvent->channelId
-            )
-        );
-        return true;
-    }
-
-    std::string queueNames = "";
-    for(QueueIterator i = m_queues->GetIterator(); !i.End(); i++)
-    {
-        QueueComponent* queue = i.GetData();
-        if(queue->up)
-            queueNames += "\"" + queue->name + "\" ";
-    }
-
-    m_robotQueue->push_back(
-        CreateErrorEvent(
-            "\"" + joinQueueEvent->queueName + "\" is not a valid queue name.\nChoices are : " + queueNames,
-            joinQueueEvent->channelId,
-            EUser,
-            EJoinQueue,
-            EForbidden
-        )
-    );
     return false;
 }
 
