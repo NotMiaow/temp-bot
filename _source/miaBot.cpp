@@ -18,9 +18,9 @@ MiaBot::~MiaBot()
 
 }
 
-void MiaBot::Loop()
+void MiaBot::Loop(const float& deltaTime)
 {
-    m_ecs.Loop();
+    m_ecs.Loop(deltaTime);
 }
 
 void MiaBot::QueueCommand(bool fromAPI, std::string command, std::string content, std::string channelId, std::string guildId)

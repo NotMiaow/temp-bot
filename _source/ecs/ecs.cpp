@@ -18,8 +18,8 @@ void ECS::Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Lo
     //Systems
 }
 
-void ECS::Loop()
+void ECS::Loop(const float& deltaTime)
 {
-
+    
 }
 

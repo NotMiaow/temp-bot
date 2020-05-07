@@ -230,7 +230,7 @@ void Loop(std::shared_ptr<DppBot> bot) {
 		else
 		{
 			// ECS loop
-			mia->Loop();
+			mia->Loop(deltaTime);
 
 			// *****Discord API has a limit of 2 requests per second*****
 			// Delay request in order not to spam the API

@@ -23,7 +23,7 @@ public:
 	ECS() {}
 	~ECS();
 	void Init(SharedQueue<Event*>& robotQueue, EntityCounter& entityCounter, Lobbies& lobbies, Preparations& preparations, Groups& groups);
-	void Loop();
+	void Loop(const float& deltaTime);
 private:
 	void WaitForTerminate();
 private:
