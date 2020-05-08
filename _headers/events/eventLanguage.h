@@ -14,8 +14,8 @@ enum EEventType
 	EError,
 	EEmpty,
 	EShutdown,
-	ECreateEvent,
 	ESendMessage,
+	ECreateEvent,
 	ENewGroup,
 	EUpdateGroup,
 	ECreateChannel,
@@ -41,9 +41,9 @@ enum EErrorType
 };
 
 static const std::map<std::string, EEventType> optionEventTypes {
-	{ "ErrorEvent", EError },
-	{ "EmptyEvent", EEmpty },
-	{ "CreateEvent", ECreateEvent },
+	{ "error", EError },
+	{ "empty", EEmpty },
+	{ "create", ECreateEvent },
 	{ "shutdown", EShutdown },
 	{ "new-group", ENewGroup },
 	{ "update-group", EUpdateGroup },

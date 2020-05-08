@@ -73,9 +73,8 @@ int main()
 		bot->debugUnhandled = false;
 
 		json self;
-		bot->prefix = "!";
-		bot->handlers.insert(
-			{
+		bot->prefix = "~";
+		bot->handlers.insert({
 				"MESSAGE_CREATE",
 				[&bot, &self](json msg) {
 					if(msg["content"].get<std::string>().substr(0,1) == bot->prefix)
@@ -83,114 +82,59 @@ int main()
 						std::string content = msg["content"].get<std::string>().substr(1);
 						int pos = content.find(' ');
 						std::string command = content.substr(0,pos++);
-						if(msg["author"]["id"].get<std::string>() == "99681408724766720")
+						content = pos < content.length() - 1 ? content.substr(pos) : "";
+						if(msg["author"]["id"].get<std::string>() == "99681408724766720" || command == "join-queue")
 						{
-							mia->QueueCommand(
-								false,
-								command,
-								pos < content.length() - 1 ? content.substr(pos) : "",
-								msg["author"]["id"],
-								msg["channel_id"],
-								msg["guild_id"].is_null() ? "" : msg["guild_id"]
-							);
-						}
-						else if (command == "join-queue")
-						{
-							mia->QueueCommand(
-								false,
-								command,
-								pos < content.length() - 1 ? content.substr(pos) : "",
-								msg["author"]["id"],
-								msg["channel_id"],
-								msg["guild_id"].is_null() ? "" : msg["guild_id"]
-							);
+							EventInfo info(false, "", "", { }, msg["author"]["id"],	msg["channel_id"], msg["guild_id"].is_null() ? "" : msg["guild_id"]);
+							mia->QueueCommand(info,	command, content);
 						}
 					}
-				}
-			}
-		);
-		bot->handlers.insert( 
-			{
+				}});
+		bot->handlers.insert({
 				"CHANNEL_CREATE",
 				[&bot, &self](json msg) {
+					std::cout << std::endl << msg << std::endl << std::endl;
+					std::string command = "new-group";
 					if(!msg["guild_id"].is_null())
 					{
-						mia->QueueCommand(
-							true,
-							"new-group",
-							msg["name"].get<std::string>() + " " +
+						json empty = { };
+						EventInfo info(true, "", "", empty, "", "", "");
+						std::string content = msg["name"].get<std::string>() + " " +
 							(msg["parent_id"].is_null() ? "" : msg["parent_id"].get<std::string>()) + " " +
 							msg["id"].get<std::string>() + " " +
 							std::to_string(msg["position"].get<int>()) + " " +
-							std::to_string(msg["type"].get<int>()),
-							"",
-							"",
-							""
-						);
+							std::to_string(msg["type"].get<int>());
+						mia->QueueCommand(info, command, content);
 					}
-				}
-			}
-		);
-		bot->handlers.insert(
-			{
+				}});
+		bot->handlers.insert({
 				"CHANNEL_DELETE",
 				[&bot, &self](json msg) {
-					mia->QueueCommand(
-						true,
-						"EmptyEvent",
-						"",
-						"",
-						"",
-						""
-					);
-				}
-			}
-		);
-		bot->handlers.insert(
-			{
+					json empty = { };
+					EventInfo info(true, "", "", empty, "", "", "");
+					mia->QueueCommand(info, "empty", "");
+				}});
+		bot->handlers.insert({
 				"CHANNEL_UPDATE",
 				[&bot, &self](json msg) {
-					mia->QueueCommand(
-						true,
-						"EmptyEvent",
-						"",
-						"",
-						"",
-						""
-					);
-				}
-			}
-		);
-		bot->handlers.insert(
-			{
+					json empty = { };
+					EventInfo info(true, "", "", empty, "", "", "");
+					mia->QueueCommand(info, "empty", "");
+				}});
+		bot->handlers.insert({
 				"GUILD_MEMBERS",
 				[&bot, &self](json msg) {
-					mia->QueueCommand(
-						true,
-						"EmptyEvent",
-						"",
-						"",
-						"",
-						""
-					);
-				}
-			}
-		);
-		bot->handlers.insert(
-			{
+					json empty = { };
+					EventInfo info(true, "", "", empty, "", "", "");
+					mia->QueueCommand(info, "empty", "");
+				}});
+		bot->handlers.insert({
 				"GUILD_MEMBER_UPDATE",
 				[&bot, &self](json msg) {
-					mia->QueueCommand(
-						true,
-						"EmptyEvent",
-						"",
-						"",
-						"",
-						""
-					);
-				}
-			}
-		);
+					json empty = { };
+					EventInfo info(true, "", "", empty, "", "", "");
+					mia->QueueCommand(info, "empty", "");
+				}});
 
 		if(alive == false)
 		{
@@ -309,7 +253,7 @@ void Loop(std::shared_ptr<DppBot>& bot) {
 				if (eventQueue.size())
 				{
 					Event* event = eventQueue.front();
-					if(event != 0 && mia->HandleEvent(event) && !event->fromAPI && !event->ReadOnly())
+					if(event != 0 && mia->HandleEvent(event) && !event->info.fromAPI && !event->ReadOnly())
 					{
 						std::cout << "send : " << event->ToDebuggable() << std::endl;
 						delayNextAPIRequest = true;
@@ -319,19 +263,19 @@ void Loop(std::shared_ptr<DppBot>& bot) {
 								Stop();
 								break;
 							case EError:
-								bot->call("POST", "/channels/" + event->channelId + "/messages", json({{"content", ((ErrorEvent*)event)->message }}));
+								bot->call("POST", "/channels/" + event->info.channelId + "/messages", json({{"content", ((ErrorEvent*)event)->message }}));
 								break;
 							case ESendMessage:
-								bot->call("POST", "/channels/" + event->channelId + "/messages", json({{"content", ((SendMessageEvent*)event)->message }}));
+								bot->call("POST", "/channels/" + event->info.channelId + "/messages", json({{"content", ((SendMessageEvent*)event)->message }}));
 								break;
 							default :
-								bot->call(event->method, event->type, event->content);
+								std::cout << event->info.method << event->info.type << event->info.content << std::endl;
+								bot->call(event->info.method, event->info.type, event->info.content);
 								break;
 						}
+						if(event->waitForResponse)
+							waitForResponse = 2.0f;
 					}
-
-					if(event->waitForResponse)
-						waitForResponse = 2.0f;
 
 					delete event;
 					eventQueue.pop_front();

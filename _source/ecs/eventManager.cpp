@@ -63,15 +63,10 @@ bool EventManager::NewGroup(Event* event)
 {
     NewGroupEvent* newGroupEvent = dynamic_cast<NewGroupEvent*>(event);
 
-    if(!newGroupEvent->fromAPI)
+    if(!newGroupEvent->info.fromAPI)
     {
-        m_robotQueue->push_back(CreateErrorEvent(
-            "Use of command : \"new-group\" is forbidden",
-            newGroupEvent->channelId,
-            EUser,
-            ECreateChannel,
-            EForbidden
-        ));
+        std::string message = "Use of command : \"new-group\" is forbidden";
+        m_robotQueue->push_back(new ErrorEvent(newGroupEvent->info, message, EUser, ECreateChannel, EForbidden));
         return false;
     }
 
@@ -85,51 +80,35 @@ bool EventManager::NewGroup(Event* event)
     }
 
     bool exists = false;
-    Groups::Entry* newChannel;
+    std::map<int, Groups::Entry*> modifiedGroupPositions;
     for(GroupsIterator i = m_groups->GetIterator(groupCheckpoint); !i.End(); i++)
     {
-        newChannel = i.GetEntry();
-        if( newChannel->data.parentId == newGroupEvent->group.parentId &&
-            newChannel->data.type == newGroupEvent->group.type &&
-            newChannel->data.name == newGroupEvent->group.name)
+        Groups::Entry* channel;
+        channel = i.GetEntry();
+        // If sibbling of added channel
+        if(channel->data.parentId == newGroupEvent->group.parentId)
         {
-                newChannel->data.id = newGroupEvent->group.id;
+            // If channel found, set it's id
+            if(channel->data.name == newGroupEvent->group.name)
+            {
+                channel->data.id = newGroupEvent->group.id;
                 exists = true;
+            }
+            // If channel is being inserted, push others
+            else if(channel->data.position >= newGroupEvent->group.position)
+                modifiedGroupPositions.insert(std::make_pair(++channel->data.position, channel));
         }
     }
 
     if(!exists)
     {
-        std::vector<std::string> parameters;
-        parameters.push_back(newGroupEvent->group.id);
-        m_robotQueue->push_back(CreateDeleteChannelEvent(false, "delete-channel", parameters, newGroupEvent->channelId, newGroupEvent->guildId));
-        m_robotQueue->push_back(CreateErrorEvent(
-            "Channel creation from the left hand side panel is forbidden.\nUse the command : \"create-channel (name) (type(0=text)(2=voice) (parent_id) (position) (user_limit?)\"",
-            // HARDCODED BECAUSE SET BOT CHANNEL IS NOT IMPLEMENTED YET
-            "705503952585883810",
-            EUser,
-            ECreateChannel,
-            EForbidden
-        ));
+        std::string message = "Channel creation from the left hand side panel is forbidden.\nUse the command : \"create-channel (name) (type(0=text)(2=voice) (parent_id) (position) (user_limit?)\"";
+        m_robotQueue->push_back(new DeleteChannelEvent(newGroupEvent->info, newGroupEvent->group.id));
+        m_robotQueue->push_back(new ErrorEvent(newGroupEvent->info, message, EUser, ENewGroup, EForbidden));
         return false;
     }
 
-//    std::map<int, int> channelOrder;
-//    for(GroupsIterator i = m_groups->GetIterator(groupCheckpoint); !i.End(); i++)
-//    {
-//        Groups::Entry* channel = i.GetEntry();
-//        if(channel->data.parentId == newGroupEvent->group.parentId && channel->data.id != newChannel->data.id)
-//        {
-//            channelOrder.insert(
-//                std::make_pair(
-//                    channel->data.position >= newGroupEvent->group.position ? channel->data.position + 1 : channel->data.position,
-//                    channel->entityId
-//                )
-//            );
-//        }
-//    }
-//
-//    SetGroupPositions(channelOrder, newGroupEvent->group.parentId, newGroupEvent->channelId, newGroupEvent->guildId);
+    SetGroupPositions(modifiedGroupPositions, newGroupEvent->info);    
     return true;
 }
 
@@ -137,18 +116,6 @@ bool EventManager::UpdateGroup(Event* event)
 {
     UpdateGroupEvent* updateGroupEvent = dynamic_cast<UpdateGroupEvent*>(event);
     
-//    if(!updateGroupEvent->fromAPI)
-//    {
-//        m_robotQueue->push_back(CreateErrorEvent(
-//            "Use of command : \"update-channel\" is forbidden",
-//            updateGroupEvent->channelId,
-//            EUser,
-//            ECreateChannel,
-//            EForbidden
-//        ));
-//        return false;
-//    }
-
     int groupCheckpoint;
     switch (updateGroupEvent->group.type)
     {
@@ -157,8 +124,6 @@ bool EventManager::UpdateGroup(Event* event)
         case 4: groupCheckpoint = GROUP_MATCH_CATEGORIES; break;
         default: return false;
     }
-
-    // TODO : FORBID USERS FROM CALLING THIS COMMAND
 
     for(GroupsIterator i = m_groups->GetIterator(groupCheckpoint); !i.End(); i++)
     {
@@ -178,32 +143,41 @@ bool EventManager::CreateChannel(Event* event)
 {
     CreateChannelEvent* createChannelEvent = dynamic_cast<CreateChannelEvent*>(event);
 
-    int childrenCount = 0;
+    Groups::Entry* parentCategory;
+    if(!GetGroupById(parentCategory, createChannelEvent->channel.parentId))
+    {
+        std::string message = "The category \"" + createChannelEvent->channel.parentId + "\"does not exist.";
+        m_robotQueue->push_back(new ErrorEvent(createChannelEvent->info, message, EUser, ECreateChannel, EForbidden));
+        return false;
+    }
+
+    int sibblingsCount = 0;
     for(GroupsIterator i = m_groups->GetIterator(createChannelEvent->channel.type == 0 ? GROUP_TEXT_CHANNELS : GROUP_VOICE_CHANNELS); !i.End(); i++)
     {
         Groups::Entry* channel = i.GetEntry();
         // Allow name once per channel types (text and voice) and parentId
-        if(channel->data.parentId == createChannelEvent->channel.parentId)
+        if(channel->data.parentId == parentCategory->data.id)
         {
-            childrenCount++;
+            sibblingsCount++;
             if( channel->data.type == createChannelEvent->channel.type &&
                 channel->data.name == createChannelEvent->channel.name)
             {
-                m_robotQueue->push_back(CreateErrorEvent(
-                    "There is already a channel named : \"" + createChannelEvent->channel.name + "\"",
-                    createChannelEvent->channelId,
-                    EUser,
-                    ECreateChannel,
-                    EForbidden
-                ));
+                std::string message = "There is already a channel named : \"" + createChannelEvent->channel.name + "\"";
+                m_robotQueue->push_back(new ErrorEvent(createChannelEvent->info, message, EUser, ECreateChannel, EForbidden));
                 return false;
             }
         }
     }
 
-    if(createChannelEvent->channel.position > childrenCount)
-        createChannelEvent->channel.position = childrenCount + 1;
+    // If the channel's position is the greatest of it's sibblings
+    // Eliminate the gap between it and the second greatest
+    if(createChannelEvent->channel.position > sibblingsCount)
+        createChannelEvent->channel.position = sibblingsCount + 1;
     createChannelEvent->CreateJson();
+
+    // Convert capital letters to lower case, else channel wont be found while comparing with API data
+    for(int i = 0; i < createChannelEvent->channel.name.length(); i++)
+        createChannelEvent->channel.name[i] = putchar(tolower(createChannelEvent->channel.name[i]));
 
     m_groups->Add(
         createChannelEvent->channel,
@@ -218,39 +192,29 @@ bool EventManager::DeleteChannel(Event* event)
     DeleteChannelEvent* deleteChannelEvent = dynamic_cast<DeleteChannelEvent*>(event);
 
     Groups::Entry* deleted;
-    if(!GetGroupById(deleted, deleteChannelEvent->channel.id))
+    if(!GetGroupById(deleted, deleteChannelEvent->channelId))
     {
-        m_robotQueue->push_back(CreateErrorEvent(
-            "Channel with id " + deleteChannelEvent->channel.id + " does not exist.",
-            deleteChannelEvent->channelId,
-            EUser,
-            ECreateChannel,
-            EForbidden
-        ));
+        std::string message = "Channel with id " + deleteChannelEvent->channelId + " does not exist.";
+        m_robotQueue->push_back(new ErrorEvent(deleteChannelEvent->info, message, EUser, ECreateChannel, EForbidden));
         return false;
     }
 
     if(deleted->data.type != 0 && deleted->data.type != 2)
     {
-        m_robotQueue->push_back(CreateErrorEvent(
-            "Command \"delete-channel\" can only be used to delete text and voice channels.",
-            deleteChannelEvent->channelId,
-            EUser,
-            EDeleteChannel,
-            EForbidden
-        ));
+        std::string message = "Command \"delete-channel\" can only be used to delete text and voice channels.";
+        m_robotQueue->push_back(new ErrorEvent(deleteChannelEvent->info, message, EUser, EDeleteChannel, EForbidden));
         return false;
     }
 
-    std::map<int, int> channelOrder;
+    std::map<int, Groups::Entry*> channelOrder;
     for(GroupsIterator i = m_groups->GetIterator(deleted->data.type == 0 ? GROUP_TEXT_CHANNELS : GROUP_VOICE_CHANNELS); !i.End(); i++)
     {
         Groups::Entry* channel = i.GetEntry();
         if(channel->data.parentId == deleted->data.parentId && channel->data.position > deleted->data.position)
-            channelOrder.insert(std::make_pair(channel->data.position - 1, channel->entityId));
+            channelOrder.insert(std::make_pair(channel->data.position--, channel));
     }
+    SetGroupPositions(channelOrder, deleteChannelEvent->info);
     m_groups->Remove(deleted->entityId);
-    SetGroupPositions(channelOrder, deleteChannelEvent->channel.parentId, deleteChannelEvent->channelId, deleteChannelEvent->guildId);
 
     return true;
 }
@@ -262,18 +226,13 @@ bool EventManager::MoveChannel(Event* event)
     Groups::Entry* moving;
     if(!GetGroupById(moving, moveChannelEvent->channel.id))
     {
-        m_robotQueue->push_back(CreateErrorEvent(
-            "Channel with id " + moveChannelEvent->channel.id + " does not exist.",
-            moveChannelEvent->channelId,
-            EUser,
-            ECreateChannel,
-            EForbidden
-        ));
+        std::string message = "Channel with id " + moveChannelEvent->channel.id + " does not exist.";
+        m_robotQueue->push_back(new ErrorEvent(moveChannelEvent->info, message, EUser, EMoveChannel, EForbidden));
         return false;
     }
 
     int childrenCount = 0;
-    std::map<int, int> channelOrder;
+    std::map<int, Groups::Entry*> channelOrder;
     for(GroupsIterator i = m_groups->GetIterator(moving->data.type == 0 ? GROUP_TEXT_CHANNELS : GROUP_VOICE_CHANNELS); !i.End(); i++)
     {
         Groups::Entry* channel = i.GetEntry();
@@ -283,9 +242,9 @@ bool EventManager::MoveChannel(Event* event)
             if(channel->data.id != moving->data.id)
             {
                 if(channel->data.position > moving->data.position && channel->data.position <= moveChannelEvent->channel.position)
-                    channelOrder.insert(std::make_pair(channel->data.position - 1, channel->entityId));
+                    channelOrder.insert(std::make_pair(channel->data.position--, channel));
                 else if (channel->data.position < moving->data.position && channel->data.position >= moveChannelEvent->channel.position)
-                    channelOrder.insert(std::make_pair(channel->data.position + 1, channel->entityId));
+                    channelOrder.insert(std::make_pair(channel->data.position++, channel));
             }
         }
     }
@@ -294,9 +253,8 @@ bool EventManager::MoveChannel(Event* event)
         moveChannelEvent->channel.position = childrenCount;
     moveChannelEvent->CreateJson();
 
-    channelOrder.insert(std::make_pair(moveChannelEvent->channel.position, moving->entityId));
-    SetGroupPositions(channelOrder, moveChannelEvent->channel.parentId, moveChannelEvent->channelId, moveChannelEvent->guildId);
-
+    channelOrder.insert(std::make_pair(moveChannelEvent->channel.position, moving));
+    SetGroupPositions(channelOrder, moveChannelEvent->info);
     return true;
 }
 
@@ -304,32 +262,29 @@ bool EventManager::CreateCategory(Event* event)
 {
     CreateCategoryEvent* createCategoryEvent = dynamic_cast<CreateCategoryEvent*>(event);
 
-    int childrenCount = 0;
+    int sibblingsCount = 0;
     for(GroupsIterator i = m_groups->GetIterator(GROUP_MATCH_CATEGORIES); !i.End(); i++)
     {
-        Groups::Entry* channel = i.GetEntry();
-        // Allow name once per channel types (text and voice) and parentId
-        if(channel->data.parentId == createCategoryEvent->category.parentId)
+        sibblingsCount++;
+        Groups::Entry* category = i.GetEntry();
+        // Counte category's children
+        if(category->data.name == createCategoryEvent->category.name)
         {
-            childrenCount++;
-            if( channel->data.type == createCategoryEvent->category.type &&
-                channel->data.name == createCategoryEvent->category.name)
-            {
-                m_robotQueue->push_back(CreateErrorEvent(
-                    "There is already a channel named : \"" + createCategoryEvent->category.name + "\"",
-                    createCategoryEvent->channelId,
-                    EUser,
-                    ECreateChannel,
-                    EForbidden
-                ));
-                return false;
-            }
+            std::string message = "There is already a category named : \"" + createCategoryEvent->category.name + "\"";
+            m_robotQueue->push_back(new ErrorEvent(createCategoryEvent->info, message, EUser, EDeleteCategory, EForbidden));
+            return false;
         }
     }
 
-    if(createCategoryEvent->category.position > childrenCount)
-        createCategoryEvent->category.position = childrenCount + 1;
+    // If the category's position is the greatest of it's sibblings
+    // Eliminate the gap between it and the second greatest
+    if(createCategoryEvent->category.position > sibblingsCount)
+        createCategoryEvent->category.position = sibblingsCount + 1;
     createCategoryEvent->CreateJson();
+
+    // Convert capital letters to lower case
+    for(int i = 0; i < createCategoryEvent->category.name.length(); i++)
+        createCategoryEvent->category.name[i] = putchar(tolower(createCategoryEvent->category.name[i]));
 
     m_groups->Add(
         createCategoryEvent->category,
@@ -344,38 +299,29 @@ bool EventManager::DeleteCategory(Event* event)
     DeleteCategoryEvent* deleteCategoryEvent = dynamic_cast<DeleteCategoryEvent*>(event);
 
     Groups::Entry* deleted;
-    if(!GetGroupById(deleted, deleteCategoryEvent->category.id))
+    if(!GetGroupById(deleted, deleteCategoryEvent->categoryId))
     {
-        m_robotQueue->push_back(CreateErrorEvent(
-            "Category with id " + deleteCategoryEvent->category.id + " does not exist.",
-            deleteCategoryEvent->channelId,
-            EUser,
-            ECreateChannel,
-            EForbidden
-        ));
+        std::string message = "Category with id " + deleteCategoryEvent->categoryId + " does not exist.";
+        m_robotQueue->push_back(new ErrorEvent(deleteCategoryEvent->info, message, EUser, EDeleteCategory, EForbidden));
         return false;
     }
 
     if(deleted->data.type != 4)
     {
-        m_robotQueue->push_back(CreateErrorEvent(
-            "Command \"delete-category\" can only be used to delete categories.",
-            deleteCategoryEvent->channelId,
-            EUser,
-            EDeleteChannel,
-            EForbidden
-        ));
+        std::string message = "Command \"delete-category\" can only be used to delete categories.";
+        m_robotQueue->push_back(new ErrorEvent(deleteCategoryEvent->info, message, EUser, EDeleteCategory, EForbidden));
         return false;
     }
 
     if(deleteCategoryEvent->deletionQueued)
     {
+        std::cout << "sup" << std::endl;
         std::map<int, int> categoryOrder;
         for(GroupsIterator i = m_groups->GetIterator(deleted->data.type == 0 ? GROUP_TEXT_CHANNELS : GROUP_VOICE_CHANNELS); !i.End(); i++)
         {
             Groups::Entry* channel = i.GetEntry();
             if(channel->data.parentId == deleted->data.parentId && channel->data.position > deleted->data.position)
-                categoryOrder.insert(std::make_pair(channel->data.position - 1, channel->entityId));
+                categoryOrder.insert(std::make_pair(channel->data.position--, channel->entityId));
         }
 
         m_groups->Remove(deleted->entityId);
@@ -384,6 +330,7 @@ bool EventManager::DeleteCategory(Event* event)
     }
     else
     {
+        std::cout << "hi" << std::endl;
         // Get text channels to be deleted
         std::map<int, std::string> textChannelsDeletionOrder;
         for(GroupsIterator i = m_groups->GetIterator(GROUP_TEXT_CHANNELS); !i.End(); i++)
@@ -406,22 +353,18 @@ bool EventManager::DeleteCategory(Event* event)
         // Reverse order saves up alot on command load.
         for (std::map<int, std::string>::reverse_iterator i = textChannelsDeletionOrder.rbegin(); i != textChannelsDeletionOrder.rend(); i++)
         {
-            std::vector<std::string> parameters;
-            parameters.push_back(i->second);
-            m_robotQueue->push_back(CreateDeleteChannelEvent(false, "delete-channel", parameters, deleteCategoryEvent->channelId, deleteCategoryEvent->guildId));
+            m_robotQueue->push_back(new DeleteChannelEvent(deleteCategoryEvent->info, i->second));
+            std::cout << "textChannel: " << i->second << std::endl;
         }
 
         for (std::map<int, std::string>::reverse_iterator i = voiceChannelsDeletionOrder.rbegin(); i != voiceChannelsDeletionOrder.rend(); i++)
         {
-            std::vector<std::string> parameters;
-            parameters.push_back(i->second);
-            m_robotQueue->push_back(CreateDeleteChannelEvent(false, "delete-channel", parameters, deleteCategoryEvent->channelId, deleteCategoryEvent->guildId));
+            m_robotQueue->push_back(new DeleteChannelEvent(deleteCategoryEvent->info, i->second));
+            std::cout << "voiceChannel: " << i->second << std::endl;
         }
-
-        std::vector<std::string> parameters;
-        parameters.push_back(deleteCategoryEvent->category.id);
-        parameters.push_back("1");
-        m_robotQueue->push_back(CreateDeleteCategoryEvent(false, "delete-category", parameters, deleteCategoryEvent->channelId, deleteCategoryEvent->guildId));
+        deleteCategoryEvent->deletionQueued = true;
+        std::cout << deleteCategoryEvent->info.ToDebuggable() << std::endl;
+        m_robotQueue->push_back(new DeleteCategoryEvent(*deleteCategoryEvent));
         return false;
     }
 }
@@ -433,18 +376,13 @@ bool EventManager::MoveCategory(Event* event)
     Groups::Entry* moving;
     if(!GetGroupById(moving, moveCategoryEvent->category.id))
     {
-        m_robotQueue->push_back(CreateErrorEvent(
-            "Channel with id " + moveCategoryEvent->category.id + " does not exist.",
-            moveCategoryEvent->channelId,
-            EUser,
-            ECreateChannel,
-            EForbidden
-        ));
+        std::string message = "Channel with id " + moveCategoryEvent->category.id + " does not exist.";
+        m_robotQueue->push_back(new ErrorEvent(moveCategoryEvent->info, message, EUser, EDeleteCategory, EForbidden));
         return false;
     }
 
     int childrenCount = 0;
-    std::map<int, int> categoryOrder;
+    std::map<int, Groups::Entry*> categoryOrder;
     for(GroupsIterator i = m_groups->GetIterator(GROUP_MATCH_CATEGORIES); !i.End(); i++)
     {
         Groups::Entry* category = i.GetEntry();
@@ -454,9 +392,9 @@ bool EventManager::MoveCategory(Event* event)
             if(category->data.id != moving->data.id)
             {
                 if(category->data.position > moving->data.position && category->data.position <= moveCategoryEvent->category.position)
-                    categoryOrder.insert(std::make_pair(category->data.position - 1, category->entityId));
+                    categoryOrder.insert(std::make_pair(category->data.position--, category));
                 else if (category->data.position < moving->data.position && category->data.position >= moveCategoryEvent->category.position)
-                    categoryOrder.insert(std::make_pair(category->data.position + 1, category->entityId));
+                    categoryOrder.insert(std::make_pair(category->data.position++, category));
             }
         }
     }
@@ -466,8 +404,8 @@ bool EventManager::MoveCategory(Event* event)
     moveCategoryEvent->CreateJson();
 
 
-    categoryOrder.insert(std::make_pair(moveCategoryEvent->category.position, moving->entityId));
-    SetGroupPositions(categoryOrder, moveCategoryEvent->category.parentId, moveCategoryEvent->channelId, moveCategoryEvent->guildId);
+    categoryOrder.insert(std::make_pair(moveCategoryEvent->category.position, moving));
+    SetGroupPositions(categoryOrder, moveCategoryEvent->info);
 
     return true;
 }
@@ -500,30 +438,17 @@ bool EventManager::CreateMatch(Event* event)
                 lobbyPosition++;
 
         //Set match name
-        std::string matchName = "lobby-";
-        matchName += std::to_string(lobbyPosition);
-        createMatchEvent->matchName = matchName;
+        createMatchEvent->matchName = "lobby-" + std::to_string(lobbyPosition);
 
-        //Create Match Holder
-        std::vector<std::string> parameters;
-        parameters.push_back(createMatchEvent->matchName);
-        parameters.push_back(std::to_string(lobbyPosition));
-        m_robotQueue->push_back(
-            CreateCreateCategoryEvent(false, "create-category", parameters, createMatchEvent->channelId, createMatchEvent->guildId)
-        );
+        //Create match's category
+        GroupComponent category;
+        category.name = createMatchEvent->matchName;
+        category.position = lobbyPosition;
+        m_robotQueue->push_back(new CreateCategoryEvent(createMatchEvent->info, category));
 
         //Launch CreateMatchEvent Step 1
-        parameters.clear();
-        parameters.push_back("1");
-        parameters.push_back(std::to_string(createMatchEvent->queueType));
-        parameters.push_back("temp");
-        parameters.push_back(createMatchEvent->matchName);
-        parameters.push_back(std::to_string(createMatchEvent->userCount));
-        for(std::vector<std::string>::iterator i = createMatchEvent->userIds.begin(); i < createMatchEvent->userIds.end(); i++)
-            parameters.push_back(*i);
-
-        m_robotQueue->push_back(CreateCreateMatchEvent(false, "create-match", parameters, createMatchEvent->channelId, createMatchEvent->guildId));
-
+        createMatchEvent->creationStep++;
+        m_robotQueue->push_back(new CreateMatchEvent(*createMatchEvent));
         return true;
     }
     //Handle CreateMatchEvent Step 1
@@ -537,43 +462,30 @@ bool EventManager::CreateMatch(Event* event)
         }
 
         //Create Team Channels
-        std::vector<std::string> parameters;
         for(int i = 0; i < 2; i++)
         {
-            std::string voiceChannelName = "team-";
-            voiceChannelName += std::to_string((i + 1));
-            parameters.clear();
-            parameters.push_back(voiceChannelName);
-            parameters.push_back("2");
-            parameters.push_back(createMatchEvent->matchId);
-            parameters.push_back(std::to_string(i + 1));
-            parameters.push_back(std::to_string(createMatchEvent->userCount / 2));
-            m_robotQueue->push_back(
-                CreateCreateChannelEvent(false, "create-channel", parameters, createMatchEvent->channelId, createMatchEvent->guildId)
-            );
+            GroupComponent voiceChannel;
+            voiceChannel.name = "team-" + std::to_string((i + 1));
+            voiceChannel.type = 2;
+            voiceChannel.position = i;
+            voiceChannel.userLimit = createMatchEvent->userCount / 2;
+            voiceChannel.parentId = createMatchEvent->matchId;
+            voiceChannel.userIds = i == 0 ? createMatchEvent->userIds1 : createMatchEvent->userIds2;
+            m_robotQueue->push_back(new CreateChannelEvent(createMatchEvent->info, voiceChannel));
         }
 
         //Create All Chat
-        parameters.clear();
-        parameters.push_back("all-chat");
-        parameters.push_back("0");
-        parameters.push_back(createMatchEvent->matchId);
-        parameters.push_back("1");
-        m_robotQueue->push_back(
-            CreateCreateChannelEvent(false, "create-channel", parameters, createMatchEvent->channelId, createMatchEvent->guildId)
-        );
+        GroupComponent textChannel;
+        textChannel.name = "all-chat";
+        textChannel.type = 0;
+        textChannel.position = 1;
+        textChannel.userLimit = createMatchEvent->userCount / 2;
+        textChannel.parentId = createMatchEvent->matchId;
+        m_robotQueue->push_back(new CreateChannelEvent(createMatchEvent->info, textChannel));
 
         //Launch CreateMatchEvent Step 2
-        parameters.clear();
-        parameters.push_back("2");
-        parameters.push_back(std::to_string(createMatchEvent->queueType));
-        parameters.push_back(createMatchEvent->matchId);
-        parameters.push_back(createMatchEvent->matchName);
-        parameters.push_back(std::to_string(createMatchEvent->userCount));
-        for(std::vector<std::string>::iterator i = createMatchEvent->userIds.begin(); i < createMatchEvent->userIds.end(); i++)
-            parameters.push_back(*i);
-        m_robotQueue->push_back(CreateCreateMatchEvent(false, "create-match", parameters, createMatchEvent->channelId, createMatchEvent->guildId));
-
+        createMatchEvent->creationStep++;
+        m_robotQueue->push_back(new CreateMatchEvent(*createMatchEvent));
         return true;
     }
     //Handle CreateMatchEvent Step 2
@@ -592,19 +504,14 @@ bool EventManager::CreateMatch(Event* event)
             if(channel->data.parentId == createMatchEvent->matchId)
             {
                 entityId = channel->entityId;
+                std::vector<std::string> userIds;
+                for(std::vector<std::string>::iterator j = createMatchEvent->userIds1.begin(); j < createMatchEvent->userIds1.end(); j++)
+                    userIds.push_back(*j);
+                for(std::vector<std::string>::iterator j = createMatchEvent->userIds2.begin(); j < createMatchEvent->userIds2.end(); j++)
+                    userIds.push_back(*j);
+
                 // Give both team VIEW_CHANNEL, SEND_MESSAGES
-                parameters.clear();
-                parameters.push_back("1");
-                parameters.push_back(channel->data.id);
-                parameters.push_back(channel->data.name);
-                parameters.push_back(std::to_string(channel->data.type));
-                parameters.push_back("68608");
-                parameters.push_back(std::to_string(createMatchEvent->userIds.size()));
-                for(std::vector<std::string>::const_iterator j = createMatchEvent->userIds.begin(); j < createMatchEvent->userIds.end(); j++)
-                    parameters.push_back(*j);
-                m_robotQueue->push_back(
-                    CreateChangeGroupPermissionsEvent(false, "give-group-permissions", parameters, createMatchEvent->channelId, createMatchEvent->guildId)
-                );
+                m_robotQueue->push_back(new ChangeGroupPermissionsEvent(createMatchEvent->info, true, channel->data, 68608, userIds));
 
                 //ECS add text channel as child of lobby
                 lobby.groupIds.push_back(channel->data.id);
@@ -619,44 +526,15 @@ bool EventManager::CreateMatch(Event* event)
             {
                 // Give each team VIEW_CHANNEL, CONNECT, SPEAK, USE_VAD on their own voice channel
                 // Give each team VIEW_CHANNEL on their opponent's voice channel
-                parameters.clear();
-                parameters.push_back("1");
-                parameters.push_back(channel->data.id);
-                parameters.push_back(channel->data.name);
-                parameters.push_back("2");
-                parameters.push_back("36701184");
-                parameters.push_back("1024");
-                parameters.push_back(std::to_string(createMatchEvent->userIds.size()));
-                if(channel->data.name == "team-1")
-                {
-                    int userCount = 0;
-                    for(std::vector<std::string>::const_iterator j = createMatchEvent->userIds.begin(); j < createMatchEvent->userIds.end();j++)
-                    {
-                        parameters.push_back(*j);
-                        if(userCount < createMatchEvent->userIds.size() / 2)
-                            channel->data.userIds.push_back(*j);
-                    }
-                }
-                else
-                {
-                    int userCount = 0;
-                    for(std::vector<std::string>::const_reverse_iterator j = createMatchEvent->userIds.rbegin(); j < createMatchEvent->userIds.rend();j++)
-                    {
-                        parameters.push_back(*j);
-                        if(userCount < createMatchEvent->userIds.size() / 2)
-                            channel->data.userIds.push_back(*j);
-                    }
-                }
-                
-                m_robotQueue->push_back(
-                    CreateSetMatchVoicePermissionsEvent(false, "set-match-voice-permissions", parameters, createMatchEvent->channelId, createMatchEvent->guildId)
-                );
+                m_robotQueue->push_back(new SetMatchVoicePermissionsEvent(
+                    createMatchEvent->info, true, channel->data, 36701184, 1024, createMatchEvent->userIds1, createMatchEvent->userIds2));
 
-                //ECS add voice channels as children of lobby
+                // ECS add voice channels as children of lobby
                 lobby.groupIds.push_back(channel->data.id);
             }
         }
         
+        // ECS create match entity
         m_preparations->Add(preparation, entityId, PREPARATION_MATCHES);
         m_lobbies->Add(lobby, entityId, LOBBY_MATCHES);
 
@@ -669,7 +547,6 @@ bool EventManager::CreateMatch(Event* event)
                 std::cout << "pushing pending" << std::endl;
             }
         }
-
         return true;
     }
     std::cout << "failed at step : " << createMatchEvent->creationStep << std::endl;
@@ -687,15 +564,15 @@ bool EventManager::JoinQueue(Event* event)
         {
             QueueComponent* queue = i.GetData();
             if(queue->type == (int)queueType->second)
-                queue->spot.push(std::make_pair(joinQueueEvent->userId, joinQueueEvent->channelId));
+                queue->spot.push(std::make_pair(joinQueueEvent->info.userId, joinQueueEvent->info.channelId));
         }
 
         m_robotQueue->push_back(
-            CreateSendMessageEvent(
+            new SendMessageEvent(
+                joinQueueEvent->info,
                 "You have successfully queued to \"" + joinQueueEvent->queueName + "\".\n" +
                 "You will be sent an invite link to your team's channel when your queue pops!" +
-                " ***(Not implemented yet)***",
-                joinQueueEvent->channelId
+                " ***(Not implemented yet)***"
             )
         );
         return true;
@@ -709,33 +586,17 @@ bool EventManager::JoinQueue(Event* event)
             queueNames += "\"" + queue->name + "\" ";
     }
 
-    m_robotQueue->push_back(
-        CreateErrorEvent(
-            "\"" + joinQueueEvent->queueName + "\" is not a valid queue name.\nChoices are : " + queueNames,
-            joinQueueEvent->channelId,
-            EUser,
-            EJoinQueue,
-            EForbidden
-        )
-    );
+    std::string message = "\"" + joinQueueEvent->queueName + "\" is not a valid queue name.\nChoices are : " + queueNames;
+    m_robotQueue->push_back(new ErrorEvent(joinQueueEvent->info, message, EUser, EJoinQueue, EForbidden));
     return false;
 }
 
-void EventManager::SetGroupPositions(std::map<int,int>& channelOrder, std::string parentId, std::string channelId, std::string guildId)
+void EventManager::SetGroupPositions(std::map<int, Groups::Entry*>& channelOrder, EventInfo info)
 {
-    int next = 1;
-    for (std::map<int, int>::reverse_iterator i = channelOrder.rbegin(); i != channelOrder.rend(); i++, next++)
+    for (std::map<int, Groups::Entry*>::reverse_iterator i = channelOrder.rbegin(); i != channelOrder.rend(); i++)
     {
-        Groups::Row group = m_groups->GetById(i->second);
-        if(group.data->position != i->first)
-        {
-            std::vector<std::string> parameters;
-            parameters.push_back(group.data->id);
-            parameters.push_back(std::to_string(group.data->type));
-            parameters.push_back(std::to_string(i->first));
-            m_robotQueue->push_back(CreateUpdateGroupEvent(false, "update-group", parameters, channelId, guildId));
-            m_groups->GetById(i->second).data->position = i->first;
-        }
+        info.fromAPI = false;
+        m_robotQueue->push_back(new UpdateGroupEvent(info, i->second->data));
     }
 }
 

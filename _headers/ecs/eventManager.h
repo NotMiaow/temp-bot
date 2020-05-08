@@ -7,6 +7,8 @@
 #include <vector>
 #include <string>
 
+#include <nlohmann/json.hpp>
+
 // Events
 #include "eventLanguage.h"
 #include "event.h"
@@ -44,7 +46,7 @@ public:
     bool CreateMatch(Event* event);
     bool MessageMatch(Event* event);
     bool JoinQueue(Event* event);
-    void SetGroupPositions(std::map<int,int>& channelOrder, std::string parentId, std::string channelId, std::string guildId);
+    void SetGroupPositions(std::map<int, Groups::Entry*>& channelOrder, EventInfo info);
     bool GetGroupById(Groups::Entry*& group, std::string id);
 private:
     // Components

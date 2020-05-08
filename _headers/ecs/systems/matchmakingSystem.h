@@ -1,6 +1,7 @@
 #ifndef MATCHMAKING_SYSTEM_H__
 #define MATCHMAKING_SYSTEM_H__
 
+#include <nlohmann/json.hpp>
 #include <algorithm>
 #include <queue>
 #include <vector>
@@ -18,6 +19,8 @@
 // Misc
 #include "eventTranslator.h"
 #include "definitions.h"
+
+using json = nlohmann::json;
 
 class MatchmakingSystem
 {

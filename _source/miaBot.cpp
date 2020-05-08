@@ -39,10 +39,10 @@ void MiaBot::Loop(const float& deltaTime)
     m_ecs.Loop(deltaTime);
 }
 
-void MiaBot::QueueCommand(bool fromAPI, std::string command, std::string content, std::string userId, std::string channelId, std::string guildId)
+void MiaBot::QueueCommand(EventInfo info, std::string command, std::string content)
 {
-    Event* event = CreateEvent(fromAPI, command, content, userId, channelId, guildId);
-    if(fromAPI)
+    Event* event = CreateEvent(info, command, content);
+    if(info.fromAPI)
         m_eventQueue->push_back(event);
     else
         m_humanQueue->push_back(event);
