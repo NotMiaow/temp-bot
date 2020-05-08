@@ -26,6 +26,8 @@ bool EventManager::HandleEvent(Event* event)
         return true;
     case EShutdown:
         return true;
+    case ESendMessage:
+        return true;
     case ENewGroup:
         return NewGroup(event);
     case EUpdateGroup:
@@ -50,6 +52,8 @@ bool EventManager::HandleEvent(Event* event)
         return true;
     case ESetMatchVoicePermissions:
         return true;
+    case EJoinQueue:
+        return JoinQueue(event);
     default:
         return false;
     }
@@ -511,6 +515,7 @@ bool EventManager::CreateMatch(Event* event)
         //Launch CreateMatchEvent Step 1
         parameters.clear();
         parameters.push_back("1");
+        parameters.push_back(std::to_string(createMatchEvent->queueType));
         parameters.push_back("temp");
         parameters.push_back(createMatchEvent->matchName);
         parameters.push_back(std::to_string(createMatchEvent->userCount));
@@ -561,6 +566,7 @@ bool EventManager::CreateMatch(Event* event)
         //Launch CreateMatchEvent Step 2
         parameters.clear();
         parameters.push_back("2");
+        parameters.push_back(std::to_string(createMatchEvent->queueType));
         parameters.push_back(createMatchEvent->matchId);
         parameters.push_back(createMatchEvent->matchName);
         parameters.push_back(std::to_string(createMatchEvent->userCount));
@@ -592,7 +598,7 @@ bool EventManager::CreateMatch(Event* event)
                 parameters.push_back(channel->data.id);
                 parameters.push_back(channel->data.name);
                 parameters.push_back(std::to_string(channel->data.type));
-                parameters.push_back("3072");
+                parameters.push_back("68608");
                 parameters.push_back(std::to_string(createMatchEvent->userIds.size()));
                 for(std::vector<std::string>::const_iterator j = createMatchEvent->userIds.begin(); j < createMatchEvent->userIds.end(); j++)
                     parameters.push_back(*j);
@@ -654,9 +660,64 @@ bool EventManager::CreateMatch(Event* event)
         m_preparations->Add(preparation, entityId, PREPARATION_MATCHES);
         m_lobbies->Add(lobby, entityId, LOBBY_MATCHES);
 
+        for(QueueIterator i = m_queues->GetIterator(QUEUE_LEAGUE_OF_LEGENDS); !i.End(); i++)
+        {
+            QueueComponent* queue = i.GetData();
+            if(queue->type == createMatchEvent->queueType)
+            {
+                queue->pending.push(lobby.groupIds[0]);
+                std::cout << "pushing pending" << std::endl;
+            }
+        }
+
         return true;
     }
     std::cout << "failed at step : " << createMatchEvent->creationStep << std::endl;
+    return false;
+}
+
+bool EventManager::JoinQueue(Event* event)
+{
+    JoinQueueEvent* joinQueueEvent = dynamic_cast<JoinQueueEvent*>(event);
+
+	auto queueType = leagueQueueTypes.find(joinQueueEvent->queueName);
+	if(queueType != leagueQueueTypes.end())
+    {
+        for(QueueIterator i = m_queues->GetIterator(); !i.End(); i++)
+        {
+            QueueComponent* queue = i.GetData();
+            if(queue->type == (int)queueType->second)
+                queue->spot.push(std::make_pair(joinQueueEvent->userId, joinQueueEvent->channelId));
+        }
+
+        m_robotQueue->push_back(
+            CreateSendMessageEvent(
+                "You have successfully queued to \"" + joinQueueEvent->queueName + "\".\n" +
+                "You will be sent an invite link to your team's channel when your queue pops!" +
+                " ***(Not implemented yet)***",
+                joinQueueEvent->channelId
+            )
+        );
+        return true;
+    }
+
+    std::string queueNames = "";
+    for(QueueIterator i = m_queues->GetIterator(); !i.End(); i++)
+    {
+        QueueComponent* queue = i.GetData();
+        if(queue->up)
+            queueNames += "\"" + queue->name + "\" ";
+    }
+
+    m_robotQueue->push_back(
+        CreateErrorEvent(
+            "\"" + joinQueueEvent->queueName + "\" is not a valid queue name.\nChoices are : " + queueNames,
+            joinQueueEvent->channelId,
+            EUser,
+            EJoinQueue,
+            EForbidden
+        )
+    );
     return false;
 }
 

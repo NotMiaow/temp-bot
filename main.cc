@@ -28,7 +28,7 @@ void filter(std::string &target, const std::string &pattern);
 auto aioc = std::make_shared<asio::io_context>();
 
 // Mia related
-void Loop(std::shared_ptr<DppBot> bot);
+void Loop(std::shared_ptr<DppBot>& bot);
 double currentTime;
 float deltaTime;
 std::chrono::time_point<std::chrono::high_resolution_clock> curTime;
@@ -52,132 +52,160 @@ std::shared_future<void> futureObj;
 
 int main()
 {
-	std::cout << "Starting Mia...\n\n";
-
-	std::string token;
+	alive = false;
+	do
 	{
-		std::ifstream tokenFile("token.dat");
-		if (!tokenFile)
+		std::cout << "Starting Mia...\n\n";
+
+		std::string token;
 		{
-			std::cerr << "CRITICAL: There is no valid way for MiaBot to obtain a token! " << std::endl;
-			exit(1);
+			std::ifstream tokenFile("token.dat");
+			if (!tokenFile)
+			{
+				std::cerr << "CRITICAL: There is no valid way for MiaBot to obtain a token! " << std::endl;
+				exit(1);
+			}
+			safeGetline(tokenFile, token);
+			tokenFile.close();
 		}
-		safeGetline(tokenFile, token);
-		tokenFile.close();
-	}
 
-	std::shared_ptr<DppBot> bot = std::make_shared<DppBot>();
-	bot->debugUnhandled = false;
+		std::shared_ptr<DppBot> bot = std::make_shared<DppBot>();
+		bot->debugUnhandled = false;
 
-	json self;
-	bot->prefix = "~";
-	bot->handlers.insert(
-		{
-			"MESSAGE_CREATE",
-			[&bot, &self](json msg) {
-				if(msg["content"].get<std::string>().substr(0,1) == bot->prefix)
-				{
-					std::string content = msg["content"].get<std::string>().substr(1);
-					int pos = content.find(' ');
-					std::string command = content.substr(0,pos++);
+		json self;
+		bot->prefix = "!";
+		bot->handlers.insert(
+			{
+				"MESSAGE_CREATE",
+				[&bot, &self](json msg) {
+					if(msg["content"].get<std::string>().substr(0,1) == bot->prefix)
+					{
+						std::string content = msg["content"].get<std::string>().substr(1);
+						int pos = content.find(' ');
+						std::string command = content.substr(0,pos++);
+						if(msg["author"]["id"].get<std::string>() == "99681408724766720")
+						{
+							mia->QueueCommand(
+								false,
+								command,
+								pos < content.length() - 1 ? content.substr(pos) : "",
+								msg["author"]["id"],
+								msg["channel_id"],
+								msg["guild_id"].is_null() ? "" : msg["guild_id"]
+							);
+						}
+						else if (command == "join-queue")
+						{
+							mia->QueueCommand(
+								false,
+								command,
+								pos < content.length() - 1 ? content.substr(pos) : "",
+								msg["author"]["id"],
+								msg["channel_id"],
+								msg["guild_id"].is_null() ? "" : msg["guild_id"]
+							);
+						}
+					}
+				}
+			}
+		);
+		bot->handlers.insert( 
+			{
+				"CHANNEL_CREATE",
+				[&bot, &self](json msg) {
+					if(!msg["guild_id"].is_null())
+					{
+						mia->QueueCommand(
+							true,
+							"new-group",
+							msg["name"].get<std::string>() + " " +
+							(msg["parent_id"].is_null() ? "" : msg["parent_id"].get<std::string>()) + " " +
+							msg["id"].get<std::string>() + " " +
+							std::to_string(msg["position"].get<int>()) + " " +
+							std::to_string(msg["type"].get<int>()),
+							"",
+							"",
+							""
+						);
+					}
+				}
+			}
+		);
+		bot->handlers.insert(
+			{
+				"CHANNEL_DELETE",
+				[&bot, &self](json msg) {
 					mia->QueueCommand(
-						false,
-						command,
-						pos < content.length() - 1 ? content.substr(pos) : "",
-						msg["channel_id"],
-						msg["guild_id"]
+						true,
+						"EmptyEvent",
+						"",
+						"",
+						"",
+						""
 					);
 				}
-			}}
-	);
-	bot->handlers.insert( 
-		{
-			"CHANNEL_CREATE",
-			[&bot, &self](json msg) {
-				mia->QueueCommand(
-					true,
-					"new-group",
-					msg["name"].get<std::string>() + " " +
-					(msg["parent_id"].is_null() ? "" : msg["parent_id"].get<std::string>()) + " " +
-					msg["id"].get<std::string>() + " " +
-					std::to_string(msg["position"].get<int>()) + " " +
-					std::to_string(msg["type"].get<int>()),
-					"",
-					""
-				);
-			}}
-	);
-	bot->handlers.insert(
-		{
-			"CHANNEL_DELETE",
-			[&bot, &self](json msg) {
-				mia->QueueCommand(
-					true,
-					"EmptyEvent",
-					"",
-					"",
-					""
-				);
 			}
-		}
-	);
-	bot->handlers.insert(
-		{
-			"CHANNEL_UPDATE",
-			[&bot, &self](json msg) {
-				mia->QueueCommand(
-					true,
-					"EmptyEvent",
-					"",
-					"",
-					""
-				);
+		);
+		bot->handlers.insert(
+			{
+				"CHANNEL_UPDATE",
+				[&bot, &self](json msg) {
+					mia->QueueCommand(
+						true,
+						"EmptyEvent",
+						"",
+						"",
+						"",
+						""
+					);
+				}
 			}
-		}
-	);
-	bot->handlers.insert(
-		{
-			"GUILD_MEMBERS",
-			[&bot, &self](json msg) {
-				std::cout << "received guild members payload" << std::endl;
-				mia->QueueCommand(
-					true,
-					"EmptyEvent",
-					"",
-					"",
-					""
-				);
+		);
+		bot->handlers.insert(
+			{
+				"GUILD_MEMBERS",
+				[&bot, &self](json msg) {
+					mia->QueueCommand(
+						true,
+						"EmptyEvent",
+						"",
+						"",
+						"",
+						""
+					);
+				}
 			}
-		}
-	);
-	bot->handlers.insert(
-		{
-			"GUILD_MEMBER_UPDATE",
-			[&bot, &self](json msg) {
-				std::cout << "received guild member update payload" << std::endl;
-				mia->QueueCommand(
-					true,
-					"EmptyEvent",
-					"",
-					"",
-					""
-				);
+		);
+		bot->handlers.insert(
+			{
+				"GUILD_MEMBER_UPDATE",
+				[&bot, &self](json msg) {
+					mia->QueueCommand(
+						true,
+						"EmptyEvent",
+						"",
+						"",
+						"",
+						""
+					);
+				}
 			}
-		}
-	);
+		);
 
-	// Launch MiaBot
-	curTime = std::chrono::high_resolution_clock::now();
-	mia = new MiaBot(eventQueue, robotQueue, humanQueue);
-	// Prepare threads
-	alive = true;
-	futureObj = exitSignal.get_future();
-	// Fire threads
-	terminateThread = std::thread(&WaitForTerminate);
-	miaLoop = std::thread(&Loop, bot);
+		if(alive == false)
+		{
+			// Launch MiaBot
+			curTime = std::chrono::high_resolution_clock::now();
+			mia = new MiaBot(eventQueue, robotQueue, humanQueue);
+			// Prepare threads
+			alive = true;
+			waitForBot = false;
+			futureObj = exitSignal.get_future();
+			// Fire threads
+			terminateThread = std::thread(&WaitForTerminate);
+			miaLoop = std::thread(&Loop, std::ref(bot));
+		}
 
-	while(alive)
-	{
 		try
 		{
 			bot->initBot(6, token, aioc);
@@ -192,8 +220,9 @@ int main()
 			errorLogFile.open ("example.txt", std::ios::app);
 			errorLogFile << "\n" << e.what() << "\n";
 			errorLogFile.close();
+			std::this_thread::sleep_for(std::chrono::milliseconds(6000));
 		}
-	}
+	} while(alive);
 
 	// Wait for clean termination
 	miaLoop.join();
@@ -202,14 +231,14 @@ int main()
 	return 0;
 }
 
-void Loop(std::shared_ptr<DppBot> bot) {
+void Loop(std::shared_ptr<DppBot>& bot) {
 	bool delayNextAPIRequest = false;
 	float waitForBotTimer = 0.0f;
 	float delayTimer = 0.0f;
 	float waitTimer = 0.0f;
 	float waitForResponse = 0.0f;
 
-	while(alive || waitForResponse > 0.0f)
+	while(alive == true || waitForResponse > 0.0f)
 	{
 		prevTime = curTime;
 		curTime = std::chrono::high_resolution_clock::now();
@@ -221,7 +250,7 @@ void Loop(std::shared_ptr<DppBot> bot) {
 		if(waitForBot)
 		{
 			waitForBotTimer += deltaTime;
-			if(waitForBotTimer > 2.0f)
+			if(waitForBotTimer > 10.0f)
 			{
 				waitForBotTimer = 0.0f;
 				waitForBot = false;
@@ -291,6 +320,9 @@ void Loop(std::shared_ptr<DppBot> bot) {
 								break;
 							case EError:
 								bot->call("POST", "/channels/" + event->channelId + "/messages", json({{"content", ((ErrorEvent*)event)->message }}));
+								break;
+							case ESendMessage:
+								bot->call("POST", "/channels/" + event->channelId + "/messages", json({{"content", ((SendMessageEvent*)event)->message }}));
 								break;
 							default :
 								bot->call(event->method, event->type, event->content);

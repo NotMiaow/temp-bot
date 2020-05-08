@@ -15,6 +15,7 @@ enum EEventType
 	EEmpty,
 	EShutdown,
 	ECreateEvent,
+	ESendMessage,
 	ENewGroup,
 	EUpdateGroup,
 	ECreateChannel,
@@ -26,7 +27,9 @@ enum EEventType
 	EMoveUser,
 	ECreateMatch,
 	EChangeGroupPermissions,
-	ESetMatchVoicePermissions
+	ESetMatchVoicePermissions,
+	EMessageMatch,
+	EJoinQueue
 };
 
 enum EErrorType
@@ -53,7 +56,9 @@ static const std::map<std::string, EEventType> optionEventTypes {
 	{ "move-user", EMoveUser},
 	{ "create-match", ECreateMatch },
 	{ "change-group-permissions", EChangeGroupPermissions },
-	{ "set-match-voice-permissions", ESetMatchVoicePermissions }
+	{ "set-match-voice-permissions", ESetMatchVoicePermissions },
+	{ "message-match", EMessageMatch },
+	{ "join-queue", EJoinQueue }
 };
 
 #endif

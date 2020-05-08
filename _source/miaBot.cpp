@@ -8,13 +8,17 @@ MiaBot::MiaBot(SharedQueue<Event*>& eventQueue, SharedQueue<Event*>& robotQueue,
     m_queues.Initialise({2});
 
     QueueComponent leaguePremadeS;
+    leaguePremadeS.name = "srank";
     leaguePremadeS.type = 0;
     leaguePremadeS.fairnessLevel = 2;
     leaguePremadeS.startTreshold = 10;
+    leaguePremadeS.up = false;
     QueueComponent leagueSRAM;
+    leagueSRAM.name = "sram";
     leagueSRAM.type = 1;
     leagueSRAM.fairnessLevel = 1;
     leagueSRAM.startTreshold = 10;
+    leagueSRAM.up = true;
     m_queues.Add(leaguePremadeS, m_entityCounter.GetId(), QUEUE_LEAGUE_OF_LEGENDS);
     m_queues.Add(leagueSRAM, m_entityCounter.GetId(), QUEUE_LEAGUE_OF_LEGENDS);
 
@@ -35,9 +39,9 @@ void MiaBot::Loop(const float& deltaTime)
     m_ecs.Loop(deltaTime);
 }
 
-void MiaBot::QueueCommand(bool fromAPI, std::string command, std::string content, std::string channelId, std::string guildId)
+void MiaBot::QueueCommand(bool fromAPI, std::string command, std::string content, std::string userId, std::string channelId, std::string guildId)
 {
-    Event* event = CreateEvent(fromAPI, command, content, channelId, guildId);
+    Event* event = CreateEvent(fromAPI, command, content, userId, channelId, guildId);
     if(fromAPI)
         m_eventQueue->push_back(event);
     else

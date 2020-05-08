@@ -29,4 +29,8 @@ enum QueueCheckpoint { QUEUE_LEAGUE_OF_LEGENDS = 0, QUEUE_CHECKPOINTS_SIZE };
 //LOL queues
 enum LeagueQueueType { LEAGUE_S_Rank, LEAGUE_SRAM };
 
+static const std::map<std::string, LeagueQueueType> leagueQueueTypes {
+//	{ "srank", LEAGUE_S_Rank },
+	{ "sram", LEAGUE_SRAM }
+};
 #endif
