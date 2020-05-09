@@ -57,7 +57,7 @@ void MatchmakingSystem::SramQueue(const float& deltaTime, QueueComponent& queue)
         for(int i = 0; i < teamPoolSize; i++)
         {
             team1Champions += "\"" + leagueChampions[i] + "\", ";
-            team2Champions += "\"" + leagueChampions[i + 1] + "\", ";
+            team2Champions += "\"" + leagueChampions[++i] + "\", ";
         }
         team1Champions = team1Champions.substr(0, team1Champions.length() - 2);
         team2Champions = team2Champions.substr(0, team2Champions.length() - 2);
