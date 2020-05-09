@@ -2,6 +2,7 @@
 #define QUEUE_COMPONENT_H__
 
 #include <queue>
+#include <deque>
 #include <string>
 
 struct QueueComponent{
@@ -13,7 +14,7 @@ struct QueueComponent{
     int fairnessLevel;
     int startTreshold;
     std::string name;
-    std::queue<std::pair<std::string, std::string>> spot;
+    std::deque<std::pair<std::string, std::string>> spot;
     std::queue<std::string> pending;
 };
 

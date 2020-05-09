@@ -418,7 +418,6 @@ struct CreateMatchEvent : public Event
 		this->queueType = queueType;
 		this->matchId = matchId;
 		this->matchName = matchName;
-		this->userCount = userCount;
 		this->userIds1 = userIds1;
 		this->userIds2 = userIds2;
 		CreateJson();
@@ -432,9 +431,9 @@ struct CreateMatchEvent : public Event
 		this->queueType = other.queueType;
 		this->matchId = other.matchId;
 		this->matchName = other.matchName;
-		this->userCount = other.userCount;
-		this->userIds1 = userIds1;
-		this->userIds2 = userIds2;
+		this->userIds1 = other.userIds1;
+		this->userIds2 = other.userIds2;
+		CreateJson();
 	}
 	bool ReadOnly() const { return true; }
 	EEventType GetType() const { return ECreateMatch; }
@@ -442,7 +441,7 @@ struct CreateMatchEvent : public Event
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
-		os << '{' << "create-match" << ';' << creationStep << ';' << queueType << ';' << matchId << ';'<< matchName << ';' << userCount << '}';
+		os << '{' << "create-match" << ';' << creationStep << ';' << queueType << ';' << matchId << ';'<< matchName << '}';
 		return os.str();
 	}
 
@@ -450,7 +449,6 @@ struct CreateMatchEvent : public Event
 	int queueType;
 	std::string matchId;
 	std::string matchName;
-	int userCount;
 	std::vector<std::string> userIds1;
 	std::vector<std::string> userIds2;
 };
@@ -463,10 +461,13 @@ struct ChangeGroupPermissionsEvent : public Event
 		this->info = info;
 		this->waitForResponse = true;
 
+		this->info.method = "PATCH";
+		this->info.type = "/channels/" + group.id;
+
 		this->give = give;
 		this->group = group;
-		this->userIds = userIds;
 		this->permissions = permissions;
+		this->userIds = userIds;
 		CreateJson();
 	}
 	bool ReadOnly() const { return false; }
@@ -519,6 +520,9 @@ struct SetMatchVoicePermissionsEvent : public Event
 		this->info = info;
 		this->waitForResponse = true;
 
+		this->info.method = "PATCH";
+		this->info.type = "/channels/" + group.id;
+
 		this->give = give;
 		this->group = group;
 		this->permissions1 = permissions1;
@@ -532,7 +536,7 @@ struct SetMatchVoicePermissionsEvent : public Event
 	void CreateJson()
 	{
 		json overwrites;
-		for(std::vector<std::string>::const_iterator i = userIds1.begin(); i < userIds1.end(); i++, i++)
+		for(std::vector<std::string>::const_iterator i = userIds1.begin(); i < userIds1.end(); i++)
 		{
 			json overwrite =
 			{
@@ -543,7 +547,7 @@ struct SetMatchVoicePermissionsEvent : public Event
 			};
 			overwrites.push_back(overwrite);
 		}
-		for(std::vector<std::string>::const_iterator i = userIds2.begin(); i < userIds2.end(); i++, i++)
+		for(std::vector<std::string>::const_iterator i = userIds2.begin(); i < userIds2.end(); i++)
 		{
 			json overwrite =
 			{
@@ -560,13 +564,12 @@ struct SetMatchVoicePermissionsEvent : public Event
 			{ "type", group.type },
 			{ "permission_overwrites", overwrites }
 	    };
-		std::cout << std::endl << std::endl << this->info.content << std::endl << std::endl;
 	}
 	std::string ToDebuggable() const
 	{
 		std::ostringstream os;
 		os << '{' << "set-match-voice-permissions" << ';' << give << ';' << group.id << ';' << group.name << ';' << group.type << ';'
-		<< permissions1 << ';' << permissions2 << ';' << "[userIds1]" << "[userIds2]" << '}';
+			<< permissions1 << ';' << permissions2 << ';' << "[userIds1]" << "[userIds2]" << '}';
 		return os.str();
 	}
 
@@ -574,7 +577,6 @@ struct SetMatchVoicePermissionsEvent : public Event
 	GroupComponent group;
 	int permissions1;
 	int permissions2;
-	int userCount;
 	std::vector<std::string> userIds1;
 	std::vector<std::string> userIds2;
 };
@@ -600,6 +602,51 @@ struct JoinQueueEvent : public Event
 	}
 
 	std::string queueName;
+};
+
+struct LeaveQueueEvent : public Event
+{
+	LeaveQueueEvent(EventInfo info)
+	{
+		this->info = info;
+		this->waitForResponse = false;
+
+		CreateJson();
+	}
+	bool ReadOnly() const { return true; }
+	EEventType GetType() const { return ELeaveQueue; }
+	void CreateJson() { }
+	std::string ToDebuggable() const
+	{
+		std::ostringstream os;
+		os << '{' << "leave-queue" << ';' << info.channelId << ';' << info.userId << '}';
+		return os.str();
+	}
+};
+
+struct SetQueueThresholdEvent : public Event
+{
+	SetQueueThresholdEvent(EventInfo info, std::string queueName, int newThreshold)
+	{
+		this->info = info;
+		this->waitForResponse = false;
+
+		this->queueName = queueName;
+		this->newThreshold = newThreshold;
+		CreateJson();
+	}
+	bool ReadOnly() const { return true; }
+	EEventType GetType() const { return ESetQueueThreshold; }
+	void CreateJson() { }
+	std::string ToDebuggable() const
+	{
+		std::ostringstream os;
+		os << '{' << "set-queue-threshold" << ';' << info.channelId << ';' << info.userId << ';' << queueName << ';' << newThreshold << '}';
+		return os.str();
+	}
+
+	std::string queueName;
+	int newThreshold;
 };
 
 #endif

@@ -93,7 +93,6 @@ int main()
 		bot->handlers.insert({
 				"CHANNEL_CREATE",
 				[&bot, &self](json msg) {
-					std::cout << std::endl << msg << std::endl << std::endl;
 					std::string command = "new-group";
 					if(!msg["guild_id"].is_null())
 					{
@@ -269,7 +268,7 @@ void Loop(std::shared_ptr<DppBot>& bot) {
 								bot->call("POST", "/channels/" + event->info.channelId + "/messages", json({{"content", ((SendMessageEvent*)event)->message }}));
 								break;
 							default :
-								std::cout << event->info.method << event->info.type << event->info.content << std::endl;
+//								std::cout << event->info.method << event->info.type << event->info.content << std::endl;
 								bot->call(event->info.method, event->info.type, event->info.content);
 								break;
 						}

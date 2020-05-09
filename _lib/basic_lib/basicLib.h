@@ -8,13 +8,6 @@
 
 static bool ToInt(std::string s, int& n)
 {
-//   try   {
-//      n = boost::lexical_cast<int>(n);
-//      return true;
-//   }
-//   catch( boost::bad_lexical_cast & e ){
-//       return false;
-//   }
 	const std::string ws(" \t\f\v\n\r");
 	size_t pos = s.find_last_not_of(ws);
 

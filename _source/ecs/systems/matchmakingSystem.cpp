@@ -12,7 +12,7 @@ MatchmakingSystem::MatchmakingSystem(SharedQueue<Event*>& robotQueue, Queues& qu
 void MatchmakingSystem::Loop(const float& deltaTime)
 {
     waitTimer += deltaTime;
-    if(waitTimer > 0.5f)
+    if(waitTimer > 2.0f)
     {
         waitTimer = 0.0f;
         for(QueueIterator matchmakingIt = m_queues->GetIterator(QUEUE_LEAGUE_OF_LEGENDS); !matchmakingIt.End(); matchmakingIt++)
@@ -45,6 +45,8 @@ void MatchmakingSystem::SRankQueue(const float& deltaTime, QueueComponent& queue
 
 void MatchmakingSystem::SramQueue(const float& deltaTime, QueueComponent& queue)
 {
+    std::cout << "queue : " << queue.name << " starts at : " << queue.startTreshold << " current : " << queue.spot.size() << std::endl;
+
     if(queue.pending.size() > 0)
     {
         srand(time(0));
@@ -52,7 +54,6 @@ void MatchmakingSystem::SramQueue(const float& deltaTime, QueueComponent& queue)
         std::string team1Champions = "";
         std::string team2Champions = "";
         int teamPoolSize = queue.startTreshold / 2 * 3;
-        std::cout << "teamPoolSize: " << teamPoolSize << std::endl;
         for(int i = 0; i < teamPoolSize; i++)
         {
             team1Champions += "\"" + leagueChampions[i] + "\", ";
@@ -75,7 +76,7 @@ void MatchmakingSystem::SramQueue(const float& deltaTime, QueueComponent& queue)
         for(int i = 0; i < queue.startTreshold; i++)
         {
             userIds.push_back(queue.spot.front().first);
-            queue.spot.pop();
+            queue.spot.pop_front();
         }
         srand(time(0));
         std::random_shuffle(userIds.begin(), userIds.end());
@@ -83,14 +84,14 @@ void MatchmakingSystem::SramQueue(const float& deltaTime, QueueComponent& queue)
         int count = 0;
         for(std::vector<std::string>::iterator i = userIds.begin(); i < userIds.end(); i++)
         {
-            if(count < queue.startTreshold / 2)
+            if(count++ < queue.startTreshold / 2)
                 userIds1.push_back(*i);
             else
                 userIds2.push_back(*i);
         }
 
         json content = { };
-        EventInfo info(false, "", "", content, "", "", "640549931190321152");
+        EventInfo info(false, "", "", content, "99681408724766720", "705503952585883810", "640549931190321152");
         m_robotQueue->push_back(new CreateMatchEvent(info, 0, LEAGUE_SRAM, "", "", userIds1, userIds2));
     }
 }

@@ -20,42 +20,26 @@ bool EventManager::HandleEvent(Event* event)
 {
     switch (event->GetType())
     {
-    case EError:
-        return true;
-    case EEmpty:
-        return true;
-    case EShutdown:
-        return true;
-    case ESendMessage:
-        return true;
-    case ENewGroup:
-        return NewGroup(event);
-    case EUpdateGroup:
-        return UpdateGroup(event);
-    case ECreateChannel:
-        return CreateChannel(event);
-    case EDeleteChannel:
-        return DeleteChannel(event);
-    case EMoveChannel:
-        return MoveChannel(event);
-    case ECreateCategory:
-        return CreateCategory(event);
-    case EDeleteCategory:
-        return DeleteCategory(event);
-    case EMoveCategory:
-        return MoveCategory(event);
-    case EMoveUser:
-        return MoveUser(event);
-    case ECreateMatch:
-        return CreateMatch(event);
-    case EChangeGroupPermissions:
-        return true;
-    case ESetMatchVoicePermissions:
-        return true;
-    case EJoinQueue:
-        return JoinQueue(event);
-    default:
-        return false;
+        case EError:                        return true;
+        case EEmpty:                        return true;
+        case EShutdown:                     return true;
+        case ESendMessage:                  return true;
+        case ENewGroup:                     return NewGroup(event);
+        case EUpdateGroup:                  return UpdateGroup(event);
+        case ECreateChannel:                return CreateChannel(event);
+        case EDeleteChannel:                return DeleteChannel(event);
+        case EMoveChannel:                  return MoveChannel(event);
+        case ECreateCategory:               return CreateCategory(event);
+        case EDeleteCategory:               return DeleteCategory(event);
+        case EMoveCategory:                 return MoveCategory(event);
+        case EMoveUser:                     return MoveUser(event);
+        case ECreateMatch:                  return CreateMatch(event);
+        case EChangeGroupPermissions:       return true;
+        case ESetMatchVoicePermissions:     return true;
+        case EJoinQueue:                    return JoinQueue(event);
+        case ELeaveQueue:                   return LeaveQueue(event);
+        case ESetQueueThreshold:            return SetQueueThreshold(event);
+        default:                            return false;
     }
 }
 
@@ -95,7 +79,7 @@ bool EventManager::NewGroup(Event* event)
                 exists = true;
             }
             // If channel is being inserted, push others
-            else if(channel->data.position >= newGroupEvent->group.position)
+            else if(groupCheckpoint != GROUP_MATCH_CATEGORIES && channel->data.position >= newGroupEvent->group.position)
                 modifiedGroupPositions.insert(std::make_pair(++channel->data.position, channel));
         }
     }
@@ -315,7 +299,6 @@ bool EventManager::DeleteCategory(Event* event)
 
     if(deleteCategoryEvent->deletionQueued)
     {
-        std::cout << "sup" << std::endl;
         std::map<int, int> categoryOrder;
         for(GroupsIterator i = m_groups->GetIterator(deleted->data.type == 0 ? GROUP_TEXT_CHANNELS : GROUP_VOICE_CHANNELS); !i.End(); i++)
         {
@@ -330,7 +313,6 @@ bool EventManager::DeleteCategory(Event* event)
     }
     else
     {
-        std::cout << "hi" << std::endl;
         // Get text channels to be deleted
         std::map<int, std::string> textChannelsDeletionOrder;
         for(GroupsIterator i = m_groups->GetIterator(GROUP_TEXT_CHANNELS); !i.End(); i++)
@@ -352,18 +334,11 @@ bool EventManager::DeleteCategory(Event* event)
         // Queue deletion of the category's channels by reverse order of position
         // Reverse order saves up alot on command load.
         for (std::map<int, std::string>::reverse_iterator i = textChannelsDeletionOrder.rbegin(); i != textChannelsDeletionOrder.rend(); i++)
-        {
             m_robotQueue->push_back(new DeleteChannelEvent(deleteCategoryEvent->info, i->second));
-            std::cout << "textChannel: " << i->second << std::endl;
-        }
-
         for (std::map<int, std::string>::reverse_iterator i = voiceChannelsDeletionOrder.rbegin(); i != voiceChannelsDeletionOrder.rend(); i++)
-        {
             m_robotQueue->push_back(new DeleteChannelEvent(deleteCategoryEvent->info, i->second));
-            std::cout << "voiceChannel: " << i->second << std::endl;
-        }
+
         deleteCategoryEvent->deletionQueued = true;
-        std::cout << deleteCategoryEvent->info.ToDebuggable() << std::endl;
         m_robotQueue->push_back(new DeleteCategoryEvent(*deleteCategoryEvent));
         return false;
     }
@@ -430,11 +405,11 @@ bool EventManager::CreateMatch(Event* event)
         for(Groups::Iterator i = m_groups->GetIterator(GROUP_MATCH_CATEGORIES); !i.End(); i++)
         {
             Groups::Entry* match = i.GetEntry();
-            matchOrder.insert(std::make_pair(match->data.position, match->entityId));
+            matchOrder.insert(std::make_pair(match->entityId, match->data.position));
         }
         int lobbyPosition = 1;
         for (std::map<int, int>::iterator i = matchOrder.begin(); i != matchOrder.end(); i++)
-            if(lobbyPosition == i->first)
+            if(lobbyPosition == i->second)
                 lobbyPosition++;
 
         //Set match name
@@ -444,6 +419,7 @@ bool EventManager::CreateMatch(Event* event)
         GroupComponent category;
         category.name = createMatchEvent->matchName;
         category.position = lobbyPosition;
+        category.type = 4;
         m_robotQueue->push_back(new CreateCategoryEvent(createMatchEvent->info, category));
 
         //Launch CreateMatchEvent Step 1
@@ -461,25 +437,24 @@ bool EventManager::CreateMatch(Event* event)
                 createMatchEvent->matchId = category->data.id;
         }
 
-        //Create Team Channels
+        //Create voice channels
         for(int i = 0; i < 2; i++)
         {
             GroupComponent voiceChannel;
             voiceChannel.name = "team-" + std::to_string((i + 1));
             voiceChannel.type = 2;
             voiceChannel.position = i;
-            voiceChannel.userLimit = createMatchEvent->userCount / 2;
+            voiceChannel.userLimit = createMatchEvent->userIds1.size();
             voiceChannel.parentId = createMatchEvent->matchId;
             voiceChannel.userIds = i == 0 ? createMatchEvent->userIds1 : createMatchEvent->userIds2;
             m_robotQueue->push_back(new CreateChannelEvent(createMatchEvent->info, voiceChannel));
         }
 
-        //Create All Chat
+        //Create all Chat
         GroupComponent textChannel;
         textChannel.name = "all-chat";
         textChannel.type = 0;
         textChannel.position = 1;
-        textChannel.userLimit = createMatchEvent->userCount / 2;
         textChannel.parentId = createMatchEvent->matchId;
         m_robotQueue->push_back(new CreateChannelEvent(createMatchEvent->info, textChannel));
 
@@ -519,6 +494,7 @@ bool EventManager::CreateMatch(Event* event)
         }
 
         // Voice channel permissions
+        bool team1 = true;
         for(Groups::Iterator i = m_groups->GetIterator(GROUP_VOICE_CHANNELS); !i.End(); i++)
         {
             Groups::Entry* channel = i.GetEntry();
@@ -527,10 +503,14 @@ bool EventManager::CreateMatch(Event* event)
                 // Give each team VIEW_CHANNEL, CONNECT, SPEAK, USE_VAD on their own voice channel
                 // Give each team VIEW_CHANNEL on their opponent's voice channel
                 m_robotQueue->push_back(new SetMatchVoicePermissionsEvent(
-                    createMatchEvent->info, true, channel->data, 36701184, 1024, createMatchEvent->userIds1, createMatchEvent->userIds2));
+                    createMatchEvent->info, true, channel->data, 36701184, 1024,
+                    team1 ? createMatchEvent->userIds1 : createMatchEvent->userIds2,
+                    team1 ? createMatchEvent->userIds2 : createMatchEvent->userIds1
+                    ));
 
                 // ECS add voice channels as children of lobby
                 lobby.groupIds.push_back(channel->data.id);
+                team1 = false;
             }
         }
         
@@ -542,14 +522,10 @@ bool EventManager::CreateMatch(Event* event)
         {
             QueueComponent* queue = i.GetData();
             if(queue->type == createMatchEvent->queueType)
-            {
                 queue->pending.push(lobby.groupIds[0]);
-                std::cout << "pushing pending" << std::endl;
-            }
         }
         return true;
     }
-    std::cout << "failed at step : " << createMatchEvent->creationStep << std::endl;
     return false;
 }
 
@@ -560,22 +536,37 @@ bool EventManager::JoinQueue(Event* event)
 	auto queueType = leagueQueueTypes.find(joinQueueEvent->queueName);
 	if(queueType != leagueQueueTypes.end())
     {
+        QueueComponent* joinQueue = 0;
         for(QueueIterator i = m_queues->GetIterator(); !i.End(); i++)
         {
             QueueComponent* queue = i.GetData();
+            for(std::deque<std::pair<std::string, std::string>>::iterator j = queue->spot.begin(); j != queue->spot.end(); j++)
+            {
+                if(j->first == joinQueueEvent->info.userId)
+                {
+                    std::string message =   "You are already queued to \"" + joinQueueEvent->queueName + "\" mode.\n" +
+                                            "Use command \"leave-queue\" to be elligible a queue again.";
+                    m_robotQueue->push_back(new ErrorEvent(joinQueueEvent->info, message, EUser, EJoinQueue, EForbidden));
+                    return false;
+                }
+            }
             if(queue->type == (int)queueType->second)
-                queue->spot.push(std::make_pair(joinQueueEvent->info.userId, joinQueueEvent->info.channelId));
+                joinQueue = i.GetData();
         }
 
-        m_robotQueue->push_back(
-            new SendMessageEvent(
-                joinQueueEvent->info,
-                "You have successfully queued to \"" + joinQueueEvent->queueName + "\".\n" +
-                "You will be sent an invite link to your team's channel when your queue pops!" +
-                " ***(Not implemented yet)***"
-            )
-        );
-        return true;
+        if(joinQueue != 0)
+        {
+            joinQueue->spot.push_back(std::make_pair(joinQueueEvent->info.userId, joinQueueEvent->info.channelId));
+            m_robotQueue->push_back(
+                new SendMessageEvent(
+                    joinQueueEvent->info,
+                    "You have successfully queued to \"" + joinQueueEvent->queueName + "\".\n" +
+                    "You will be sent an invite link to your team's channel when your queue pops!" +
+                    " ***(Not implemented yet)***"
+                )
+            );
+            return true;
+        }
     }
 
     std::string queueNames = "";
@@ -588,6 +579,62 @@ bool EventManager::JoinQueue(Event* event)
 
     std::string message = "\"" + joinQueueEvent->queueName + "\" is not a valid queue name.\nChoices are : " + queueNames;
     m_robotQueue->push_back(new ErrorEvent(joinQueueEvent->info, message, EUser, EJoinQueue, EForbidden));
+    return false;
+}
+
+bool EventManager::LeaveQueue(Event* event)
+{
+    LeaveQueueEvent* leaveQueueEvent = dynamic_cast<LeaveQueueEvent*>(event);
+
+    for(QueueIterator i = m_queues->GetIterator(); !i.End(); i++)
+    {
+        QueueComponent* queue = i.GetData();
+        for(std::deque<std::pair<std::string, std::string>>::iterator j = queue->spot.begin(); j != queue->spot.end(); j++)
+        {
+            if(j->first == leaveQueueEvent->info.userId)
+            {
+                queue->spot.erase(j);
+                std::string message = "You have successfully left queue.\nYou are now elligible to queue again.";
+                m_robotQueue->push_back(new SendMessageEvent(leaveQueueEvent->info, message));
+                return true;
+            }
+        }
+    }
+
+    m_robotQueue->push_back(
+        new SendMessageEvent(
+            leaveQueueEvent->info,
+            "You are not in a queue."
+        )
+    );
+    return false;
+}
+
+bool EventManager::SetQueueThreshold(Event* event)
+{
+    SetQueueThresholdEvent* setQueueThresholdEvent = dynamic_cast<SetQueueThresholdEvent*>(event);
+
+    for(QueueIterator i = m_queues->GetIterator(); !i.End(); i++)
+    {
+        QueueComponent* queue = i.GetData();
+        if(queue->name == setQueueThresholdEvent->queueName)
+        {
+            queue->startTreshold = setQueueThresholdEvent->newThreshold;
+            return true;
+        }
+    }
+
+    std::string queueNames = "";
+    for(QueueIterator i = m_queues->GetIterator(); !i.End(); i++)
+    {
+        QueueComponent* queue = i.GetData();
+        if(queue->up)
+            queueNames += "\"" + queue->name + "\" ";
+    }
+
+    std::string message = "\"" + setQueueThresholdEvent->queueName + "\" is not a valid queue name.\nChoices are : " + queueNames;
+    m_robotQueue->push_back(new ErrorEvent(setQueueThresholdEvent->info, message, EUser, ESetQueueThreshold, EForbidden));
+
     return false;
 }
 

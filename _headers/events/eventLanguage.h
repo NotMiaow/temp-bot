@@ -29,7 +29,9 @@ enum EEventType
 	EChangeGroupPermissions,
 	ESetMatchVoicePermissions,
 	EMessageMatch,
-	EJoinQueue
+	EJoinQueue,
+	ELeaveQueue,
+	ESetQueueThreshold
 };
 
 enum EErrorType
@@ -58,7 +60,9 @@ static const std::map<std::string, EEventType> optionEventTypes {
 	{ "change-group-permissions", EChangeGroupPermissions },
 	{ "set-match-voice-permissions", ESetMatchVoicePermissions },
 	{ "message-match", EMessageMatch },
-	{ "join-queue", EJoinQueue }
+	{ "join-queue", EJoinQueue },
+	{ "leave-queue", ELeaveQueue },
+	{ "set-queue-threshold", ESetQueueThreshold }
 };
 
 #endif

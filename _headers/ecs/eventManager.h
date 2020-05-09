@@ -4,6 +4,7 @@
 #include <iostream>
 #include <math.h>
 #include <deque>
+#include <queue>
 #include <vector>
 #include <string>
 
@@ -46,6 +47,8 @@ public:
     bool CreateMatch(Event* event);
     bool MessageMatch(Event* event);
     bool JoinQueue(Event* event);
+    bool LeaveQueue(Event* event);
+    bool SetQueueThreshold(Event* event);
     void SetGroupPositions(std::map<int, Groups::Entry*>& channelOrder, EventInfo info);
     bool GetGroupById(Groups::Entry*& group, std::string id);
 private:

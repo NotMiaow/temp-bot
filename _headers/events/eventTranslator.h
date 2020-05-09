@@ -109,7 +109,6 @@ static Event* CreateCreateChannelEvent(EventInfo info, std::string command, std:
 	{
 		if(!isalnum(channel.name[i]) && channel.name[i] != '-')
 		{
-			std::cout << "FORBIDDEN_CHARACTER: " << channel.name[i] << std::endl;
 			return CreateErrorEvent(
 				info,
 				"Parameter 1 (name) of " + command + " must be composed of only alphanumeric caracters and '-'." + seeSignature,
@@ -222,7 +221,7 @@ static Event* CreateCreateCategoryEvent(EventInfo info, std::string command, std
 	}
 
 	if(!ToInt(parameters[1], category.position))
-		return CreateErrorEvent(info, "Parameter 5 (channel position) of " + command + " must be an integral number.", EUser, ECreateCategory, EWrongParameterType);
+		return CreateErrorEvent(info, "Parameter 2 (position) of " + command + " must be an integral number.", EUser, ECreateCategory, EWrongParameterType);
 
 	Event *e = new CreateCategoryEvent(info, category);
 	return e;
@@ -294,9 +293,48 @@ static Event* CreateJoinQueueEvent(EventInfo info, std::string command, std::vec
 	return e;
 }
 
+static Event* CreateLeaveQueueEvent(EventInfo info, std::string command, std::vector<std::string> parameters)
+{
+	std::string seeSignature = "\nSee signature : \"" + command + "\"";
+
+	if(parameters.size() != 0)
+		return CreateErrorEvent(
+			info,
+			"Wrong parameter amount." + seeSignature,
+			EUser, ESetQueueThreshold, EWrongParemeterAmount
+		);
+
+	Event* e = new LeaveQueueEvent(info);
+	return e;
+}
+
+static Event* CreateSetQueueThreshold(EventInfo info, std::string command, std::vector<std::string> parameters)
+{
+	std::string seeSignature = "\nSee signature : \"" + command + " (queueName) (threshold)\"";
+
+	if(parameters.size() != 2)
+		return CreateErrorEvent(
+			info,
+			"Wrong parameter amount." + seeSignature,
+			EUser, ESetQueueThreshold, EWrongParemeterAmount
+		);
+
+	int threshold;
+	if(!ToInt(parameters[1], threshold))
+		return CreateErrorEvent(info, "Parameter 2 (threshold) of " + command + " must be an even integral number.", EUser, ESetQueueThreshold, EWrongParameterType);
+
+	if(threshold % 2 == 1)
+		return CreateErrorEvent(info, "Parameter 2 (threshold) of " + command + " must be an even integral number.", EUser, ESetQueueThreshold, EWrongParameterType);
+
+	Event* e = new SetQueueThresholdEvent(info, parameters[0], threshold);
+	return e;
+}
+
 static Event* CreateEvent(EventInfo info, std::string command, std::string content)
 {
-	std::vector<std::string> parameters = Split(content, ' ');
+	std::vector<std::string> parameters;
+	if (content.length() - command.length() != 0)
+		parameters = Split(content, ' ');
 
 	auto it = optionEventTypes.find(command);
 	if(it != optionEventTypes.end())
@@ -318,6 +356,8 @@ static Event* CreateEvent(EventInfo info, std::string command, std::string conte
 		case EChangeGroupPermissions:	return CreateErrorEvent(info, "This command can not be used by a human.", EUser, ECreateEvent, EWrongEventType);
 		case ESetMatchVoicePermissions:	return CreateErrorEvent(info, "This command can not be used by a human.", EUser, ECreateEvent, EWrongEventType);
 		case EJoinQueue:				return CreateJoinQueueEvent(info, command, parameters);
+		case ELeaveQueue:				return CreateLeaveQueueEvent(info, command, parameters);
+		case ESetQueueThreshold:		return CreateSetQueueThreshold(info, command, parameters);
 		default:						return CreateErrorEvent(info, "This command does not exist.", EUser, ECreateEvent, EWrongEventType);
 		}
 	}
