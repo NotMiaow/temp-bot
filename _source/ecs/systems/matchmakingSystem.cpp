@@ -53,8 +53,8 @@ void MatchmakingSystem::SramQueue(const float& deltaTime, QueueComponent& queue)
         std::random_shuffle(leagueChampions.begin(), leagueChampions.end());
         std::string team1Champions = "";
         std::string team2Champions = "";
-        int teamPoolSize = queue.startTreshold / 2 * 3;
-        for(int i = 0; i < teamPoolSize; i++)
+        int championPool = queue.startTreshold * 3;
+        for(int i = 0; i < championPool; i++)
         {
             team1Champions += "\"" + leagueChampions[i] + "\", ";
             team2Champions += "\"" + leagueChampions[++i] + "\", ";
