@@ -73,7 +73,7 @@ int main()
 		bot->debugUnhandled = false;
 
 		json self;
-		bot->prefix = "~";
+		bot->prefix = "/";
 		bot->handlers.insert({
 				"MESSAGE_CREATE",
 				[&bot, &self](json msg) {
